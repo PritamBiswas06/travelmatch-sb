@@ -50,4 +50,26 @@ public class User {
 
     @Column(name = "reset_code_expiry")
     private LocalDateTime resetCodeExpiry;
+
+    // ==================== PROFILE FIELDS ====================
+    // Kept on User rather than a separate Profile entity: only a handful of
+    // simple, always-present fields are needed, so a 1:1 join table would add
+    // complexity without benefit.
+
+    @Column(length = 500)
+    private String bio;
+
+    // Free-text travel style, e.g. "Adventure • Solo • Backpacking"
+    private String travelStyle;
+
+    // Comma-separated list, e.g. "Hiking,Photography,Food"
+    @Column(length = 500)
+    private String travelInterests;
+
+    // Comma-separated list, e.g. "Goa,Manali,Kerala"
+    @Column(length = 500)
+    private String preferredDestinations;
+
+    // Free-text budget preference, e.g. "Budget" / "Moderate" / "Luxury"
+    private String budgetPreference;
 }
