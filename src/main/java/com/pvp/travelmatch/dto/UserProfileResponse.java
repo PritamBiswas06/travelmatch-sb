@@ -1,5 +1,6 @@
 package com.pvp.travelmatch.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,6 +43,7 @@ public class UserProfileResponse {
     private String websiteUrl;
 
     // True when the profile belongs to the currently authenticated user.
+    @JsonProperty("isOwnProfile")
     private boolean isOwnProfile;
 
     private List<ProfileTripResponse> upcomingTrips;
