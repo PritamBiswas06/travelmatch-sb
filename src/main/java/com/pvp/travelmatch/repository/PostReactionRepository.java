@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface PostReactionRepository extends JpaRepository<PostReaction, Long> {
 
+    void deleteByTravelPlan(TravelPlan travelPlan);
     Optional<PostReaction> findByTravelPlanAndUser(TravelPlan travelPlan, User user);
 
     long countByTravelPlanAndReactionType(TravelPlan travelPlan, String reactionType);

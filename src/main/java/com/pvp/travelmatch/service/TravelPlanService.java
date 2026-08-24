@@ -7,13 +7,13 @@ import com.pvp.travelmatch.entity.MatchRequest;
 import com.pvp.travelmatch.entity.PostReaction;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
-import com.pvp.travelmatch.repository.MatchRequestRepository;
-import com.pvp.travelmatch.repository.PostReactionRepository;
-import com.pvp.travelmatch.repository.TravelPlanRepository;
-import com.pvp.travelmatch.repository.UserRepository;
+import com.pvp.travelmatch.repository.*;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,6 +30,7 @@ public class TravelPlanService {
     private final EmailService emailService;
     private final PostReactionRepository postReactionRepository;
     private final MatchRequestRepository matchRequestRepository;
+    private final TravelPartnerRepository travelPartnerRepository;
 
     public TravelPlan createPlan(TravelPlanRequest request) {
 
@@ -411,5 +412,27 @@ Keep an eye on your inbox for match requests 👀
                 .orElse(null);
 
         return toFeedPostResponse(plan, currentUser, myLatestPlan);
+    }
+
+    @Transactional
+    public void deletePlan(Long planId) {
+
+        User currentUser = getCurrentUser();
+
+        TravelPlan plan = travelPlanRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Travel plan not found"));
+
+        if (!plan.getUser().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only delete your own travel plans"
+            );
+        }
+
+        postReactionRepository.deleteByTravelPlan(plan);
+        matchRequestRepository.deleteByTravelPlan(plan);
+        travelPartnerRepository.deleteByTravelPlan(plan);
+
+        travelPlanRepository.delete(plan);
     }
 }

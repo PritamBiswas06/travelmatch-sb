@@ -55,4 +55,9 @@ public class TravelPlanController {
     public FeedPostResponse sharePlan(@PathVariable Long planId) {
         return travelPlanService.sharePost(planId);
     }
+
+    @DeleteMapping("/{planId}")
+    public void deletePlan(@PathVariable Long planId) {
+        travelPlanService.deletePlan(planId);
+    }
 }

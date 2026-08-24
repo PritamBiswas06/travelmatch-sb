@@ -1,6 +1,7 @@
 package com.pvp.travelmatch.repository;
 
 import com.pvp.travelmatch.entity.TravelPartner;
+import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,5 +17,7 @@ public interface TravelPartnerRepository extends JpaRepository<TravelPartner, Lo
     """)
     boolean arePartners(User u1, User u2);
 
+    void deleteByTravelPlan(TravelPlan travelPlan);
     List<TravelPartner> findByUserOneOrUserTwo(User userOne, User userTwo);
+    List<TravelPartner> findByTravelPlan(TravelPlan travelPlan);
 }
