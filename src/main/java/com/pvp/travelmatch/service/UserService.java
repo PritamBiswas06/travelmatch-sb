@@ -12,15 +12,23 @@ import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    private static final int MAX_BIO_LENGTH = 500;
+    private static final int MAX_IDEAL_PARTNER_LENGTH = 500;
+    private static final long MAX_PHOTO_SIZE_BYTES = 2L * 1024 * 1024; // 2MB
+    private static final Set<String> ALLOWED_PHOTO_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     private final UserRepository userRepository;
     private final TravelPlanRepository travelPlanRepository;
@@ -45,16 +53,32 @@ public class UserService {
                 .map(plan -> toProfileTripResponse(plan, currentUser, isOwnProfile))
                 .toList();
 
+        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips);
+    }
+
+    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips) {
         return UserProfileResponse.builder()
-                .userId(targetUser.getId())
-                .name(targetUser.getName())
-                .city(targetUser.getCity())
-                .verified(Boolean.TRUE.equals(targetUser.getVerified()))
-                .bio(targetUser.getBio())
-                .travelStyle(targetUser.getTravelStyle())
-                .travelInterests(splitToList(targetUser.getTravelInterests()))
-                .preferredDestinations(splitToList(targetUser.getPreferredDestinations()))
-                .budgetPreference(targetUser.getBudgetPreference())
+                .userId(user.getId())
+                .name(user.getName())
+                .username(user.getUsername())
+                .age(user.getAge())
+                .gender(user.getGender())
+                .city(user.getCity())
+                .state(user.getState())
+                .country(user.getCountry())
+                .verified(Boolean.TRUE.equals(user.getVerified()))
+                .bio(user.getBio())
+                .profilePhotoUrl(toPhotoDataUri(user))
+                .travelStyle(splitToList(user.getTravelStyle()))
+                .travelInterests(splitToList(user.getTravelInterests()))
+                .preferredDestinations(splitToList(user.getPreferredDestinations()))
+                .budgetPreference(user.getBudgetPreference())
+                .travelFrequency(user.getTravelFrequency())
+                .languages(splitToList(user.getLanguages()))
+                .idealTravelPartner(user.getIdealTravelPartner())
+                .instagramUrl(user.getInstagramUrl())
+                .linkedinUrl(user.getLinkedinUrl())
+                .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
                 .upcomingTrips(upcomingTrips)
                 .build();
@@ -89,23 +113,90 @@ public class UserService {
         // from a client-supplied user id, so a user can only ever edit themself.
         User currentUser = getCurrentUser();
 
+        if (request.getName() != null) {
+            String name = request.getName().trim();
+            if (name.isEmpty()) {
+                throw new RuntimeException("Name cannot be empty");
+            }
+            currentUser.setName(name);
+        }
+
+        if (request.getUsername() != null) {
+            currentUser.setUsername(validateAndNormalizeUsername(request.getUsername(), currentUser.getId()));
+        }
+
+        if (request.getAge() != null) {
+            if (request.getAge() < 1 || request.getAge() > 120) {
+                throw new RuntimeException("Please enter a valid age");
+            }
+            currentUser.setAge(request.getAge());
+        }
+
+        if (request.getGender() != null) {
+            currentUser.setGender(blankToNull(request.getGender()));
+        }
+
         if (request.getCity() != null) {
-            currentUser.setCity(request.getCity());
+            currentUser.setCity(blankToNull(request.getCity()));
         }
+
+        if (request.getState() != null) {
+            currentUser.setState(blankToNull(request.getState()));
+        }
+
+        if (request.getCountry() != null) {
+            currentUser.setCountry(blankToNull(request.getCountry()));
+        }
+
         if (request.getBio() != null) {
-            currentUser.setBio(request.getBio());
+            if (request.getBio().length() > MAX_BIO_LENGTH) {
+                throw new RuntimeException("Bio must be " + MAX_BIO_LENGTH + " characters or fewer");
+            }
+            currentUser.setBio(blankToNull(request.getBio()));
         }
-        if (request.getTravelStyle() != null) {
-            currentUser.setTravelStyle(request.getTravelStyle());
-        }
+
         if (request.getBudgetPreference() != null) {
-            currentUser.setBudgetPreference(request.getBudgetPreference());
+            currentUser.setBudgetPreference(blankToNull(request.getBudgetPreference()));
         }
+
+        if (request.getTravelFrequency() != null) {
+            currentUser.setTravelFrequency(blankToNull(request.getTravelFrequency()));
+        }
+
+        if (request.getIdealTravelPartner() != null) {
+            if (request.getIdealTravelPartner().length() > MAX_IDEAL_PARTNER_LENGTH) {
+                throw new RuntimeException("Ideal travel partner description must be "
+                        + MAX_IDEAL_PARTNER_LENGTH + " characters or fewer");
+            }
+            currentUser.setIdealTravelPartner(blankToNull(request.getIdealTravelPartner()));
+        }
+
+        if (request.getInstagramUrl() != null) {
+            currentUser.setInstagramUrl(validateAndNormalizeUrl(request.getInstagramUrl()));
+        }
+
+        if (request.getLinkedinUrl() != null) {
+            currentUser.setLinkedinUrl(validateAndNormalizeUrl(request.getLinkedinUrl()));
+        }
+
+        if (request.getWebsiteUrl() != null) {
+            currentUser.setWebsiteUrl(validateAndNormalizeUrl(request.getWebsiteUrl()));
+        }
+
+        if (request.getTravelStyle() != null) {
+            currentUser.setTravelStyle(joinDistinct(request.getTravelStyle()));
+        }
+
         if (request.getTravelInterests() != null) {
-            currentUser.setTravelInterests(String.join(",", request.getTravelInterests()));
+            currentUser.setTravelInterests(joinDistinct(request.getTravelInterests()));
         }
+
         if (request.getPreferredDestinations() != null) {
-            currentUser.setPreferredDestinations(String.join(",", request.getPreferredDestinations()));
+            currentUser.setPreferredDestinations(joinDistinct(request.getPreferredDestinations()));
+        }
+
+        if (request.getLanguages() != null) {
+            currentUser.setLanguages(joinDistinct(request.getLanguages()));
         }
 
         userRepository.save(currentUser);
@@ -113,7 +204,110 @@ public class UserService {
         return getProfile(currentUser.getId());
     }
 
+    // ==================== PROFILE PHOTO ====================
+
+    public UserProfileResponse uploadProfilePhoto(MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Please choose a photo to upload");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_PHOTO_TYPES.contains(contentType.toLowerCase())) {
+            throw new RuntimeException("Photo must be a JPEG, PNG, or WEBP image");
+        }
+
+        if (file.getSize() > MAX_PHOTO_SIZE_BYTES) {
+            throw new RuntimeException("Photo must be smaller than 2MB");
+        }
+
+        User currentUser = getCurrentUser();
+
+        try {
+            currentUser.setProfilePhoto(file.getBytes());
+            currentUser.setProfilePhotoContentType(contentType);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not read uploaded photo");
+        }
+
+        userRepository.save(currentUser);
+
+        return getProfile(currentUser.getId());
+    }
+
+    public UserProfileResponse removeProfilePhoto() {
+
+        User currentUser = getCurrentUser();
+
+        currentUser.setProfilePhoto(null);
+        currentUser.setProfilePhotoContentType(null);
+
+        userRepository.save(currentUser);
+
+        return getProfile(currentUser.getId());
+    }
+
     // ==================== HELPERS ====================
+
+    private String toPhotoDataUri(User user) {
+        if (user.getProfilePhoto() == null || user.getProfilePhoto().length == 0
+                || user.getProfilePhotoContentType() == null) {
+            return null;
+        }
+        String base64 = Base64.getEncoder().encodeToString(user.getProfilePhoto());
+        return "data:" + user.getProfilePhotoContentType() + ";base64," + base64;
+    }
+
+    private String validateAndNormalizeUsername(String rawUsername, Long currentUserId) {
+        String username = rawUsername.trim();
+
+        if (username.isEmpty()) {
+            return null; // explicit clear
+        }
+
+        if (!username.matches("^[a-zA-Z0-9_.]{3,30}$")) {
+            throw new RuntimeException(
+                    "Username must be 3-30 characters and contain only letters, numbers, dots, or underscores"
+            );
+        }
+
+        userRepository.findByUsernameIgnoreCase(username).ifPresent(existing -> {
+            if (!existing.getId().equals(currentUserId)) {
+                throw new RuntimeException("That username is already taken");
+            }
+        });
+
+        return username;
+    }
+
+    private String validateAndNormalizeUrl(String rawUrl) {
+        String url = rawUrl.trim();
+
+        if (url.isEmpty()) {
+            return null; // explicit clear
+        }
+
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw new RuntimeException("Links must start with http:// or https://");
+        }
+
+        return url;
+    }
+
+    private String blankToNull(String value) {
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String joinDistinct(List<String> values) {
+        List<String> cleaned = values.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
+        return cleaned.isEmpty() ? null : String.join(",", cleaned);
+    }
 
     private List<String> splitToList(String csv) {
         if (csv == null || csv.isBlank()) {
