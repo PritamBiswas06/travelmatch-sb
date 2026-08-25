@@ -6,5 +6,6 @@ public enum NotificationType {
     MATCH_REQUEST_REJECTED,
     NEW_MESSAGE,
     PROFILE_VIEW,
+    POST_LIKE,
     SYSTEM
 }

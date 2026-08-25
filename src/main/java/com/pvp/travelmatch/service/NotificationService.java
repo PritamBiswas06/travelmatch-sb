@@ -28,10 +28,10 @@ public class NotificationService {
     private final UserRepository userRepository;
 
     // ==================== Current authenticated user ====================
-    // Same pattern as MatchRequestService/UserService: the JWT filter puts
-    // the user's email (not an id) into the SecurityContext as the
-    // principal. We always resolve the User from THAT, never from anything
-    // the client sends.
+    // Same pattern as MatchRequestService/UserService/ChatService: the JWT
+    // filter puts the user's email (not an id) into the SecurityContext as
+    // the principal. We always resolve the User from THAT, never from
+    // anything the client sends.
     private User getCurrentUser() {
         String email = (String) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
@@ -42,7 +42,7 @@ public class NotificationService {
 
     // ==================== Create ====================
     // Generic creation entry point reused by every notification-producing
-    // feature (match requests, profile views, etc.).
+    // feature (match requests, profile views, chat messages, post likes, etc.).
     @Transactional
     public Notification createNotification(User receiver, User sender, String message,
                                            NotificationType type, Long relatedEntityId) {
@@ -92,6 +92,90 @@ public class NotificationService {
                 "👀 " + viewer.getName() + " viewed your profile.",
                 NotificationType.PROFILE_VIEW,
                 viewer.getId() // lets the frontend navigate to /profile/{viewerId}
+        );
+    }
+
+    // ==================== Chat message ====================
+    // Called from ChatService.sendMessage() after a message is successfully
+    // saved. `receiver` and `sender` are both resolved server-side by the
+    // caller (JWT for sender, path id for receiver) - never trusted from
+    // the request body.
+    @Transactional
+    public void createChatMessageNotification(User receiver, User sender) {
+
+        if (receiver.getId().equals(sender.getId())) {
+            return; // never notify a user about messaging themself
+        }
+
+        // Avoid spam: if the receiver already has an UNREAD "new message"
+        // notification from this exact sender, don't create another one -
+        // several messages sent while the chat is unopened collapse into a
+        // single notification. It resets once the receiver reads it or
+        // opens the conversation (see markMessageNotificationsAsRead).
+        boolean alreadyHasUnreadNotification = notificationRepository
+                .existsBySenderIdAndReceiverIdAndTypeAndIsReadFalse(
+                        sender.getId(),
+                        receiver.getId(),
+                        NotificationType.NEW_MESSAGE
+                );
+
+        if (alreadyHasUnreadNotification) {
+            return;
+        }
+
+        createNotification(
+                receiver,
+                sender,
+                "💬 " + sender.getName() + " sent you a message.",
+                NotificationType.NEW_MESSAGE,
+                sender.getId() // lets the frontend navigate to /chat/{senderId}
+        );
+    }
+
+    // Called from ChatService.getConversation() when a user opens a chat -
+    // clears any unread "new message" notifications from that specific
+    // partner, so the badge/panel reflect that the messages were seen.
+    @Transactional
+    public void markMessageNotificationsAsRead(Long receiverId, Long senderId) {
+        notificationRepository.markAsReadBySenderAndReceiverAndType(
+                receiverId, senderId, NotificationType.NEW_MESSAGE
+        );
+    }
+
+    // ==================== Post like ====================
+    // Called from TravelPlanService.setReaction() only on the specific
+    // transition where a user's reaction on a post becomes LIKE (fresh like,
+    // or switching from DISLIKE to LIKE). `postOwner` and `liker` are both
+    // resolved server-side by the caller (JWT for liker, TravelPlan.user for
+    // owner) - never trusted from the request.
+    @Transactional
+    public void createPostLikeNotification(User postOwner, User liker, Long travelPlanId) {
+
+        if (postOwner.getId().equals(liker.getId())) {
+            return; // never notify a user about liking their own post
+        }
+
+        // Avoid spam: if the post owner already has an UNREAD "liked your
+        // post" notification from this exact liker for this exact post,
+        // don't create another one (e.g. rapid unlike/re-like clicking).
+        boolean alreadyHasUnreadNotification = notificationRepository
+                .existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
+                        liker.getId(),
+                        postOwner.getId(),
+                        NotificationType.POST_LIKE,
+                        travelPlanId
+                );
+
+        if (alreadyHasUnreadNotification) {
+            return;
+        }
+
+        createNotification(
+                postOwner,
+                liker,
+                "❤️ " + liker.getName() + " liked your travel post.",
+                NotificationType.POST_LIKE,
+                travelPlanId // lets the frontend navigate to the relevant post
         );
     }
 

@@ -31,6 +31,7 @@ public class TravelPlanService {
     private final PostReactionRepository postReactionRepository;
     private final MatchRequestRepository matchRequestRepository;
     private final TravelPartnerRepository travelPartnerRepository;
+    private final NotificationService notificationService;
 
     public TravelPlan createPlan(TravelPlanRequest request) {
 
@@ -360,6 +361,13 @@ Keep an eye on your inbox for match requests 👀
         Optional<PostReaction> existing =
                 postReactionRepository.findByTravelPlanAndUser(plan, currentUser);
 
+        // Captured BEFORE mutation: was the user's reaction already LIKE?
+        // Used below to notify only when the final reaction actually
+        // BECOMES LIKE (fresh like, or switching DISLIKE -> LIKE) - never
+        // on unlike (toggle-off), dislike, or switching LIKE -> DISLIKE.
+        boolean wasAlreadyLiked = existing.isPresent()
+                && "LIKE".equals(existing.get().getReactionType());
+
         if (existing.isPresent()) {
 
             PostReaction reaction = existing.get();
@@ -384,6 +392,20 @@ Keep an eye on your inbox for match requests 👀
                     .build();
 
             postReactionRepository.save(reaction);
+        }
+
+        // 🔔 Notify the post owner only when this action's final result is
+        // a LIKE - not on dislike, unlike, or LIKE -> DISLIKE switches.
+        // Wrapped so a notification failure can never break liking/disliking.
+        boolean becameLike = "LIKE".equals(reactionType) && !wasAlreadyLiked;
+
+        if (becameLike) {
+            try {
+                notificationService.createPostLikeNotification(plan.getUser(), currentUser, plan.getId());
+            } catch (Exception e) {
+                // Deliberately swallow: reacting to a post must always
+                // succeed even if the notification side-effect fails.
+            }
         }
 
         List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);

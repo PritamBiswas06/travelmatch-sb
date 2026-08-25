@@ -35,4 +35,39 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             NotificationType type,
             LocalDateTime after
     );
+
+    // Used to prevent NEW_MESSAGE notification spam: true if the receiver
+    // already has an UNREAD "new message" notification from this exact
+    // sender (so several messages sent while the chat is unopened collapse
+    // into a single notification).
+    boolean existsBySenderIdAndReceiverIdAndTypeAndIsReadFalse(
+            Long senderId,
+            Long receiverId,
+            NotificationType type
+    );
+
+    // Called when the receiver opens the conversation with a given sender -
+    // clears that sender's unread "new message" notification(s) so the next
+    // message they send creates a fresh notification.
+    @Modifying
+    @Query("UPDATE Notification n SET n.isRead = true " +
+            "WHERE n.receiver.id = :receiverId AND n.sender.id = :senderId " +
+            "AND n.type = :type AND n.isRead = false")
+    int markAsReadBySenderAndReceiverAndType(
+            @Param("receiverId") Long receiverId,
+            @Param("senderId") Long senderId,
+            @Param("type") NotificationType type
+    );
+
+    // Used to prevent POST_LIKE notification spam: true if the post owner
+    // already has an UNREAD "liked your post" notification from this exact
+    // liker for this exact post (relatedEntityId = travelPlan id). Scoped by
+    // post (not just sender/receiver) so liking a different post still
+    // notifies normally.
+    boolean existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
+            Long senderId,
+            Long receiverId,
+            NotificationType type,
+            Long relatedEntityId
+    );
 }

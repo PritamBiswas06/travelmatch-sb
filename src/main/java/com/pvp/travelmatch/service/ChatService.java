@@ -22,6 +22,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final TravelPartnerRepository travelPartnerRepository;
+    private final NotificationService notificationService;
 
     // 🔥 Send Message
     public Message sendMessage(Long receiverId, String content) {
@@ -51,7 +52,19 @@ public class ChatService {
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        return messageRepository.save(message);
+        Message saved = messageRepository.save(message);
+
+        // 🔔 Notify the receiver of the new message - only reached after the
+        // message is actually persisted above. Wrapped so a notification
+        // failure can never break sending a chat message.
+        try {
+            notificationService.createChatMessageNotification(receiver, sender);
+        } catch (Exception e) {
+            // Deliberately swallow: sending a message must always succeed
+            // even if the notification side-effect fails.
+        }
+
+        return saved;
     }
 
     // 🔥 Get Conversation
@@ -73,6 +86,16 @@ public class ChatService {
 
         if (!isPartner) {
             throw new RuntimeException("Not allowed to view this conversation");
+        }
+
+        // 🔔 Opening this conversation means any pending "new message"
+        // notifications from this specific partner have now been seen -
+        // clear them so they don't linger unread in the notification panel.
+        try {
+            notificationService.markMessageNotificationsAsRead(currentUser.getId(), otherUser.getId());
+        } catch (Exception e) {
+            // Deliberately swallow: viewing the conversation must always
+            // succeed even if clearing notifications fails.
         }
 
         return messageRepository
