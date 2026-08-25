@@ -24,6 +24,7 @@ public class MatchRequestService {
     private final UserRepository userRepository;
     private final TravelPartnerRepository travelPartnerRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
 
     public List<?> findMatches(Long planId) {
@@ -141,6 +142,17 @@ public class MatchRequestService {
 
         MatchRequest saved = matchRequestRepository.save(request);
 
+        // 🔔 Notify the receiver that they got a new Travel Match request.
+        // Only fires here, after the request row is actually persisted -
+        // never on a failed/duplicate/self-request path (those throw above).
+        notificationService.createNotification(
+                receiver,
+                sender,
+                "✈️ " + sender.getName() + " sent you a Travel Match request.",
+                NotificationType.MATCH_REQUEST_RECEIVED,
+                saved.getId()
+        );
+
         String reviewLink = "https://travelmatch49.netlify.app/requests";
 
 // HTML Email
@@ -220,17 +232,17 @@ Adventure starts with one decision 🌍
 //        MatchRequest updated = matchRequestRepository.save(request);
 //
 //        // 🔥 If ACCEPTED → create TravelPartner
-////        if (status.equals("ACCEPTED")) {
-////
-////            TravelPartner partner = TravelPartner.builder()
-////                    .userOne(request.getSender())
-////                    .userTwo(request.getReceiver())
-////                    .travelPlan(request.getTravelPlan())
-////                    .createdAt(LocalDateTime.now())
-////                    .build();
-////
-////            travelPartnerRepository.save(partner);
-////        }
+    ////        if (status.equals("ACCEPTED")) {
+    ////
+    ////            TravelPartner partner = TravelPartner.builder()
+    ////                    .userOne(request.getSender())
+    ////                    .userTwo(request.getReceiver())
+    ////                    .travelPlan(request.getTravelPlan())
+    ////                    .createdAt(LocalDateTime.now())
+    ////                    .build();
+    ////
+    ////            travelPartnerRepository.save(partner);
+    ////        }
 //
 //
 //
@@ -276,35 +288,46 @@ Adventure starts with one decision 🌍
 //    }
 
 
-public MatchRequest updateStatus(Long requestId, String status) {
+    public MatchRequest updateStatus(Long requestId, String status) {
 
-    MatchRequest request = matchRequestRepository.findById(requestId)
-            .orElseThrow(() -> new RuntimeException("Request not found"));
+        MatchRequest request = matchRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
 
-    request.setStatus(status);
+        request.setStatus(status);
 
-    MatchRequest updated = matchRequestRepository.save(request);
+        MatchRequest updated = matchRequestRepository.save(request);
 
-    if (status.equals("ACCEPTED")) {
+        if (status.equals("ACCEPTED")) {
 
-        TravelPartner partner = TravelPartner.builder()
-                .userOne(request.getSender())
-                .userTwo(request.getReceiver())
-                .travelPlan(request.getTravelPlan())
-                .createdAt(LocalDateTime.now())
-                .build();
+            TravelPartner partner = TravelPartner.builder()
+                    .userOne(request.getSender())
+                    .userTwo(request.getReceiver())
+                    .travelPlan(request.getTravelPlan())
+                    .createdAt(LocalDateTime.now())
+                    .build();
 
-        travelPartnerRepository.save(partner);
+            travelPartnerRepository.save(partner);
 
-        User sender = request.getSender();
-        User receiver = request.getReceiver();
-        String destination = request.getTravelPlan().getDestination();
+            User sender = request.getSender();
+            User receiver = request.getReceiver();
+            String destination = request.getTravelPlan().getDestination();
 
-        String senderChatLink = "https://travelmatch49.netlify.app/chat/" + receiver.getId();
-        String receiverChatLink = "https://travelmatch49.netlify.app/chat/" + sender.getId();
+            // 🔔 Notify the original sender that their request was accepted.
+            // Only reached inside this ACCEPTED branch, i.e. only after the
+            // status update + partner creation above actually succeeded.
+            notificationService.createNotification(
+                    sender,
+                    receiver,
+                    "🎉 Your Travel Match request was accepted by " + receiver.getName() + ".",
+                    NotificationType.MATCH_REQUEST_ACCEPTED,
+                    updated.getId()
+            );
 
-        // -------- HTML TEMPLATE FOR SENDER --------
-        String senderHtml = """
+            String senderChatLink = "https://travelmatch49.netlify.app/chat/" + receiver.getId();
+            String receiverChatLink = "https://travelmatch49.netlify.app/chat/" + sender.getId();
+
+            // -------- HTML TEMPLATE FOR SENDER --------
+            String senderHtml = """
         <html>
         <body style="font-family:Arial;background:#f4f6fb;padding:30px;">
         <div style="max-width:600px;margin:auto;background:white;border-radius:10px;overflow:hidden;
@@ -342,8 +365,8 @@ public MatchRequest updateStatus(Long requestId, String status) {
         """.formatted(sender.getName(), receiver.getName(), destination, senderChatLink);
 
 
-        // -------- HTML TEMPLATE FOR RECEIVER --------
-        String receiverHtml = """
+            // -------- HTML TEMPLATE FOR RECEIVER --------
+            String receiverHtml = """
         <html>
         <body style="font-family:Arial;background:#f4f6fb;padding:30px;">
         <div style="max-width:600px;margin:auto;background:white;border-radius:10px;overflow:hidden;
@@ -381,22 +404,38 @@ public MatchRequest updateStatus(Long requestId, String status) {
         """.formatted(receiver.getName(), sender.getName(), destination, receiverChatLink);
 
 
-        // SEND EMAILS
-        emailService.sendHtmlEmail(
-                sender.getEmail(),
-                "Your Travel Request Was Accepted 🎉",
-                senderHtml
-        );
+            // SEND EMAILS
+            emailService.sendHtmlEmail(
+                    sender.getEmail(),
+                    "Your Travel Request Was Accepted 🎉",
+                    senderHtml
+            );
 
-        emailService.sendHtmlEmail(
-                receiver.getEmail(),
-                "New Travel Partner Confirmed 🤝",
-                receiverHtml
-        );
+            emailService.sendHtmlEmail(
+                    receiver.getEmail(),
+                    "New Travel Partner Confirmed 🤝",
+                    receiverHtml
+            );
+
+        } else if (status.equals("REJECTED")) {
+
+            User sender = request.getSender();
+            User receiver = request.getReceiver();
+
+            // 🔔 Notify the original sender that their request was rejected.
+            // Only reached inside this REJECTED branch, i.e. only after the
+            // status update above actually succeeded.
+            notificationService.createNotification(
+                    sender,
+                    receiver,
+                    "❌ Your Travel Match request was rejected by " + receiver.getName() + ".",
+                    NotificationType.MATCH_REQUEST_REJECTED,
+                    updated.getId()
+            );
+        }
+
+        return updated;
     }
-
-    return updated;
-}
 
     // View Incoming Requests
     public List<MatchRequest> getMyRequests() {

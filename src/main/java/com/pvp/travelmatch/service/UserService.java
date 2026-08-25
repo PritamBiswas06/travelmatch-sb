@@ -33,6 +33,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final TravelPlanRepository travelPlanRepository;
     private final MatchRequestRepository matchRequestRepository;
+    private final NotificationService notificationService;
 
     // ==================== VIEW PROFILE ====================
 
@@ -44,6 +45,22 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Traveler not found"));
 
         boolean isOwnProfile = currentUser.getId().equals(targetUser.getId());
+
+        // 🔔 Notify the profile owner that someone viewed their profile.
+        // - Only when it's NOT the owner's own profile.
+        // - Viewer/owner are both resolved server-side above (JWT + path id
+        //   lookup), never trusted from any request body/query param.
+        // - Deduplicated inside NotificationService (max 1 per viewer/owner
+        //   pair per 24h), so refreshing the page repeatedly won't spam.
+        // - Wrapped so a notification failure can never break profile viewing.
+        if (!isOwnProfile) {
+            try {
+                notificationService.createProfileViewNotification(targetUser, currentUser);
+            } catch (Exception e) {
+                // Deliberately swallow: viewing a profile must always succeed
+                // even if the notification side-effect fails.
+            }
+        }
 
         List<ProfileTripResponse> upcomingTrips = travelPlanRepository.findByUser(targetUser).stream()
                 .filter(plan -> "ACTIVE".equalsIgnoreCase(plan.getStatus())
