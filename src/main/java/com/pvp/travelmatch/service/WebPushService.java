@@ -86,6 +86,11 @@ public class WebPushService {
 
             int status = response.getStatusLine().getStatusCode();
 
+            System.out.println(
+                    "WEB PUSH RESULT: subscription=" + subscription.getId()
+                            + ", status=" + status
+            );
+
             if (status == 404 || status == 410) {
                 pushSubscriptionRepository.delete(subscription);
             } else if (status < 200 || status >= 300) {
