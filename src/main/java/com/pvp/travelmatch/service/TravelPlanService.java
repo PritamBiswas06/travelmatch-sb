@@ -36,6 +36,7 @@ public class TravelPlanService {
     private final MatchRequestRepository matchRequestRepository;
     private final TravelPartnerRepository travelPartnerRepository;
     private final NotificationService notificationService;
+    private final CompatibilityService compatibilityService;
 
     public TravelPlan createPlan(TravelPlanRequest request) {
 
@@ -263,7 +264,9 @@ Keep an eye on your inbox for match requests 👀
                 .map(MatchRequest::getStatus)
                 .orElse("NONE");
 
-        Integer matchScore = myLatestPlan == null ? null : computeFeedMatchScore(myLatestPlan, plan);
+        CompatibilityService.CompatibilityResult compatibility = compatibilityService.calculate(
+                currentUser, myLatestPlan, plan.getUser(), plan
+        );
 
         return FeedPostResponse.builder()
                 .id(plan.getId())
@@ -278,59 +281,14 @@ Keep an eye on your inbox for match requests 👀
                 .travelType(plan.getTravelType())
                 .status(plan.getStatus())
                 .createdAt(plan.getCreatedAt())
-                .matchScore(matchScore)
+                .matchScore(compatibility.score())
+                .matchFactors(compatibility.factors())
                 .likeCount(likeCount)
                 .dislikeCount(dislikeCount)
                 .shareCount(plan.getShareCount())
                 .currentUserReaction(myReaction)
                 .matchRequestStatus(matchRequestStatus)
                 .build();
-    }
-
-    // Generalized version of the scoring logic in findMatches(), safe to use on
-    // candidates that may not share the exact same destination.
-    private Integer computeFeedMatchScore(TravelPlan myPlan, TravelPlan candidate) {
-
-        int score = 0;
-
-        if (myPlan.getDestination() != null &&
-                myPlan.getDestination().equalsIgnoreCase(candidate.getDestination())) {
-            score += 40;
-        }
-
-        if (myPlan.getStartDate() != null && myPlan.getEndDate() != null &&
-                candidate.getStartDate() != null && candidate.getEndDate() != null) {
-
-            long totalDays = myPlan.getStartDate().until(myPlan.getEndDate()).getDays();
-
-            long overlapStart = candidate.getStartDate().isAfter(myPlan.getStartDate())
-                    ? candidate.getStartDate().toEpochDay()
-                    : myPlan.getStartDate().toEpochDay();
-
-            long overlapEnd = candidate.getEndDate().isBefore(myPlan.getEndDate())
-                    ? candidate.getEndDate().toEpochDay()
-                    : myPlan.getEndDate().toEpochDay();
-
-            long overlapDays = overlapEnd - overlapStart;
-
-            if (overlapDays > 0 && totalDays > 0) {
-                double overlapPercent = (double) overlapDays / totalDays;
-                score += (int) (overlapPercent * 30);
-            }
-        }
-
-        if (myPlan.getBudget() != null && candidate.getBudget() != null && myPlan.getBudget() > 0) {
-            double budgetDiff = Math.abs(myPlan.getBudget() - candidate.getBudget());
-            double budgetPercent = 1 - (budgetDiff / myPlan.getBudget());
-            score += (int) (Math.max(budgetPercent, 0) * 20);
-        }
-
-        if (myPlan.getTravelType() != null &&
-                myPlan.getTravelType().equalsIgnoreCase(candidate.getTravelType())) {
-            score += 10;
-        }
-
-        return Math.min(score, 100);
     }
 
     // ==================== REACTIONS ====================

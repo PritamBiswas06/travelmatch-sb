@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -27,7 +28,11 @@ public class FeedPostResponse {
     private String status;
     private LocalDateTime createdAt;
 
-    private Integer matchScore; // null if not computable (e.g. viewer has no active plan of their own)
+    private Integer matchScore; // null if not computable (nothing comparable on either side)
+
+    // "Why this match?" breakdown, e.g. [{Destination, Excellent}, {Budget, Good}, ...].
+    // Empty when matchScore is null.
+    private List<CompatibilityFactorResponse> matchFactors;
 
     private long likeCount;
     private long dislikeCount;
