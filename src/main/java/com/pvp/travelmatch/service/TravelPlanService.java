@@ -1,5 +1,6 @@
 package com.pvp.travelmatch.service;
 
+import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
@@ -8,8 +9,11 @@ import com.pvp.travelmatch.entity.PostReaction;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
 import com.pvp.travelmatch.repository.*;
+import com.pvp.travelmatch.specification.TravelPlanSpecifications;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -125,33 +129,6 @@ Keep an eye on your inbox for match requests 👀
         return savedPlan;
     }
 
-//    public List<TravelPlan> findMatches(Long planId) {
-//
-//        TravelPlan myPlan = travelPlanRepository.findById(planId)
-//                .orElseThrow(() -> new RuntimeException("Plan not found"));
-//
-//        List<TravelPlan> candidates = travelPlanRepository.findMatchingPlans(
-//                myPlan.getDestination(),
-//                myPlan.getStartDate(),
-//                myPlan.getEndDate(),
-//                myPlan.getUser().getId()
-//        );
-//
-//        // 🔥 Budget Filtering (within 30% difference)
-//        return candidates.stream()
-//                .filter(plan -> {
-//                    double myBudget = myPlan.getBudget();
-//                    double otherBudget = plan.getBudget();
-//
-//                    double difference = Math.abs(myBudget - otherBudget);
-//                    return difference <= myBudget * 0.3;
-//                })
-//                .toList();
-//    }
-
-
-
-
     public List<MatchResponse> findMatches(Long planId) {
 
         TravelPlan myPlan = travelPlanRepository.findById(planId)
@@ -228,12 +205,18 @@ Keep an eye on your inbox for match requests 👀
 
     // ==================== FEED ====================
 
-    public List<FeedPostResponse> getFeed(String sortBy) {
+    public List<FeedPostResponse> getFeed(String sortBy, FeedFilterRequest filter) {
 
         User currentUser = getCurrentUser();
 
+        // All destination/location/budget/date/travelType filters are applied
+        // at the database level via a Specification, so no unfiltered
+        // over-fetching happens regardless of how many filters are active.
+        Specification<TravelPlan> spec =
+                TravelPlanSpecifications.feedFilters(currentUser.getId(), LocalDate.now(), filter);
+
         List<TravelPlan> feedPlans =
-                travelPlanRepository.findFeedPlans(currentUser.getId(), LocalDate.now());
+                travelPlanRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         // Used to compute an optional match score against the viewer's own trips
         List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
@@ -245,6 +228,15 @@ Keep an eye on your inbox for match requests 👀
                 .map(plan -> toFeedPostResponse(plan, currentUser, myLatestPlan))
                 .collect(java.util.stream.Collectors.toList());
 
+        // Match score isn't a DB column (it's computed per-viewer), so the
+        // "minimum match %" filter is applied here, after scoring.
+        if (filter != null && filter.getMinMatchScore() != null) {
+            int minScore = filter.getMinMatchScore();
+            posts = posts.stream()
+                    .filter(p -> p.getMatchScore() != null && p.getMatchScore() >= minScore)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
         if ("popular".equalsIgnoreCase(sortBy)) {
             posts.sort(Comparator.comparingLong(FeedPostResponse::getLikeCount).reversed());
         } else if ("match".equalsIgnoreCase(sortBy)) {
@@ -252,7 +244,7 @@ Keep an eye on your inbox for match requests 👀
                     (FeedPostResponse p) -> p.getMatchScore() == null ? -1 : p.getMatchScore()
             ).reversed());
         }
-        // "latest" (default) is already the natural order from findFeedPlans (createdAt DESC)
+        // "latest" (default) is already the natural order from the query (createdAt DESC)
 
         return posts;
     }

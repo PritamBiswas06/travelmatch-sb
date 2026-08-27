@@ -3,12 +3,13 @@ package com.pvp.travelmatch.repository;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.List;
 
-public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
+public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long>, JpaSpecificationExecutor<TravelPlan> {
 
     // For Dashboard
     List<TravelPlan> findByUser(User user);

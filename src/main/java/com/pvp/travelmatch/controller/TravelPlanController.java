@@ -1,13 +1,16 @@
 package com.pvp.travelmatch.controller;
 
+import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.service.TravelPlanService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -36,9 +39,28 @@ public class TravelPlanController {
 
     @GetMapping("/feed")
     public List<FeedPostResponse> getFeed(
-            @RequestParam(required = false, defaultValue = "latest") String sort
+            @RequestParam(required = false, defaultValue = "latest") String sort,
+            @RequestParam(required = false) String destination,
+            @RequestParam(required = false) String fromLocation,
+            @RequestParam(required = false) Double minBudget,
+            @RequestParam(required = false) Double maxBudget,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String travelType,
+            @RequestParam(required = false) Integer minMatchScore
     ) {
-        return travelPlanService.getFeed(sort);
+        FeedFilterRequest filter = FeedFilterRequest.builder()
+                .destination(destination)
+                .fromLocation(fromLocation)
+                .minBudget(minBudget)
+                .maxBudget(maxBudget)
+                .startDate(startDate)
+                .endDate(endDate)
+                .travelType(travelType)
+                .minMatchScore(minMatchScore)
+                .build();
+
+        return travelPlanService.getFeed(sort, filter);
     }
 
     @PostMapping("/{planId}/like")
