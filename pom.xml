@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -65,7 +65,7 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
@@ -92,23 +92,8 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-    <groupId>com.fasterxml.jackson.core</groupId>
-    <artifactId>jackson-databind</artifactId>
-</dependency>
-		<dependency>
-			<groupId>nl.martijndwars</groupId>
-			<artifactId>web-push</artifactId>
-			<version>5.1.2</version>
-		</dependency>
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk18on</artifactId>
-			<version>1.81</version>
-		</dependency>
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcpkix-jdk18on</artifactId>
-			<version>1.81</version>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -124,6 +109,42 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+
+		<!-- 📱 Web Push (standard Web Push API + VAPID, no paid/SaaS provider).
+		     Used only by WebPushService to deliver an existing Notification as
+		     a browser/OS push message. -->
+		<dependency>
+			<groupId>nl.martijndwars</groupId>
+			<artifactId>web-push</artifactId>
+			<version>5.1.2</version>
+		</dependency>
+
+		<!-- web-push declares this as <scope>runtime</scope> in its own POM,
+		     so PushService.send()'s org.apache.http.HttpResponse return type
+		     is on the runtime classpath but NOT the compile classpath by
+		     default. WebPushService references that type directly, so it
+		     must be redeclared here at (default) compile scope - same
+		     version Maven already resolves transitively, so nothing else
+		     changes. -->
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpasyncclient</artifactId>
+			<version>4.1.5</version>
+		</dependency>
+
+		<!-- web-push's JCE provider for VAPID's ES256/ECDH crypto. Declared
+		     explicitly (rather than relying on whatever transitive version
+		     web-push pulls in) so it's a known-good version on Java 21. -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.81</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcpkix-jdk18on</artifactId>
+			<version>1.81</version>
 		</dependency>
 	</dependencies>
 
