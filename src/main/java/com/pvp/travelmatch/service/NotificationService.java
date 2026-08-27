@@ -19,19 +19,17 @@ import java.util.List;
 public class NotificationService {
 
     // Minimum gap before the same viewer can trigger another PROFILE_VIEW
-    // notification for the same profile owner. Keeps the dedup rule simple -
-    // one existence check against the notifications table, no new tables,
-    // no scheduled cleanup job.
+    // notification for the same profile owner.
     private static final long PROFILE_VIEW_DEDUPLICATION_HOURS = 24;
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
+    // Web Push service used to deliver browser/mobile push notifications.
+    private final WebPushService webPushService;
+
     // ==================== Current authenticated user ====================
-    // Same pattern as MatchRequestService/UserService/ChatService: the JWT
-    // filter puts the user's email (not an id) into the SecurityContext as
-    // the principal. We always resolve the User from THAT, never from
-    // anything the client sends.
+
     private User getCurrentUser() {
         String email = (String) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
@@ -41,11 +39,16 @@ public class NotificationService {
     }
 
     // ==================== Create ====================
+
     // Generic creation entry point reused by every notification-producing
-    // feature (match requests, profile views, chat messages, post likes, etc.).
+    // feature such as match requests, profile views, chat messages and likes.
     @Transactional
-    public Notification createNotification(User receiver, User sender, String message,
-                                           NotificationType type, Long relatedEntityId) {
+    public Notification createNotification(
+            User receiver,
+            User sender,
+            String message,
+            NotificationType type,
+            Long relatedEntityId) {
 
         Notification notification = Notification.builder()
                 .receiver(receiver)
@@ -57,33 +60,58 @@ public class NotificationService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return notificationRepository.save(notification);
+        // IMPORTANT:
+        // Save the normal in-app notification first.
+        Notification saved = notificationRepository.save(notification);
+
+        // Then attempt Web Push.
+        //
+        // Push failure must NEVER break the main action or prevent
+        // the database notification from being created.
+        try {
+            webPushService.sendToUser(
+                    receiver,
+                    "TravelMatch",
+                    message,
+                    type,
+                    relatedEntityId
+            );
+        } catch (Exception e) {
+            // Intentionally ignored.
+            // The in-app notification has already been saved successfully.
+            System.err.println(
+                    "Web Push notification failed: " + e.getMessage()
+            );
+        }
+
+        return saved;
     }
 
     // ==================== Profile view ====================
-    // Called from UserService.getProfile() whenever an authenticated user
-    // views someone else's profile. Both `profileOwner` and `viewer` are
-    // resolved server-side (JWT + path-id lookup) by the caller - this
-    // method never receives or trusts a client-supplied id.
+
     @Transactional
-    public void createProfileViewNotification(User profileOwner, User viewer) {
+    public void createProfileViewNotification(
+            User profileOwner,
+            User viewer) {
 
         if (profileOwner.getId().equals(viewer.getId())) {
-            return; // never notify a user about viewing their own profile
+            return;
         }
 
-        LocalDateTime since = LocalDateTime.now().minusHours(PROFILE_VIEW_DEDUPLICATION_HOURS);
+        LocalDateTime since = LocalDateTime.now()
+                .minusHours(PROFILE_VIEW_DEDUPLICATION_HOURS);
 
-        boolean alreadyNotifiedRecently = notificationRepository
-                .existsBySenderIdAndReceiverIdAndTypeAndCreatedAtAfter(
-                        viewer.getId(),
-                        profileOwner.getId(),
-                        NotificationType.PROFILE_VIEW,
-                        since
-                );
+        boolean alreadyNotifiedRecently =
+                notificationRepository
+                        .existsBySenderIdAndReceiverIdAndTypeAndCreatedAtAfter(
+                                viewer.getId(),
+                                profileOwner.getId(),
+                                NotificationType.PROFILE_VIEW,
+                                since
+                        );
 
         if (alreadyNotifiedRecently) {
-            return; // avoid spamming the profile owner on repeated views/refreshes
+            return;
         }
 
         createNotification(
@@ -91,33 +119,28 @@ public class NotificationService {
                 viewer,
                 "👀 " + viewer.getName() + " viewed your profile.",
                 NotificationType.PROFILE_VIEW,
-                viewer.getId() // lets the frontend navigate to /profile/{viewerId}
+                viewer.getId()
         );
     }
 
     // ==================== Chat message ====================
-    // Called from ChatService.sendMessage() after a message is successfully
-    // saved. `receiver` and `sender` are both resolved server-side by the
-    // caller (JWT for sender, path id for receiver) - never trusted from
-    // the request body.
+
     @Transactional
-    public void createChatMessageNotification(User receiver, User sender) {
+    public void createChatMessageNotification(
+            User receiver,
+            User sender) {
 
         if (receiver.getId().equals(sender.getId())) {
-            return; // never notify a user about messaging themself
+            return;
         }
 
-        // Avoid spam: if the receiver already has an UNREAD "new message"
-        // notification from this exact sender, don't create another one -
-        // several messages sent while the chat is unopened collapse into a
-        // single notification. It resets once the receiver reads it or
-        // opens the conversation (see markMessageNotificationsAsRead).
-        boolean alreadyHasUnreadNotification = notificationRepository
-                .existsBySenderIdAndReceiverIdAndTypeAndIsReadFalse(
-                        sender.getId(),
-                        receiver.getId(),
-                        NotificationType.NEW_MESSAGE
-                );
+        boolean alreadyHasUnreadNotification =
+                notificationRepository
+                        .existsBySenderIdAndReceiverIdAndTypeAndIsReadFalse(
+                                sender.getId(),
+                                receiver.getId(),
+                                NotificationType.NEW_MESSAGE
+                        );
 
         if (alreadyHasUnreadNotification) {
             return;
@@ -128,43 +151,43 @@ public class NotificationService {
                 sender,
                 "💬 " + sender.getName() + " sent you a message.",
                 NotificationType.NEW_MESSAGE,
-                sender.getId() // lets the frontend navigate to /chat/{senderId}
+                sender.getId()
         );
     }
 
-    // Called from ChatService.getConversation() when a user opens a chat -
-    // clears any unread "new message" notifications from that specific
-    // partner, so the badge/panel reflect that the messages were seen.
+    // Called when a user opens a chat.
     @Transactional
-    public void markMessageNotificationsAsRead(Long receiverId, Long senderId) {
+    public void markMessageNotificationsAsRead(
+            Long receiverId,
+            Long senderId) {
+
         notificationRepository.markAsReadBySenderAndReceiverAndType(
-                receiverId, senderId, NotificationType.NEW_MESSAGE
+                receiverId,
+                senderId,
+                NotificationType.NEW_MESSAGE
         );
     }
 
     // ==================== Post like ====================
-    // Called from TravelPlanService.setReaction() only on the specific
-    // transition where a user's reaction on a post becomes LIKE (fresh like,
-    // or switching from DISLIKE to LIKE). `postOwner` and `liker` are both
-    // resolved server-side by the caller (JWT for liker, TravelPlan.user for
-    // owner) - never trusted from the request.
+
     @Transactional
-    public void createPostLikeNotification(User postOwner, User liker, Long travelPlanId) {
+    public void createPostLikeNotification(
+            User postOwner,
+            User liker,
+            Long travelPlanId) {
 
         if (postOwner.getId().equals(liker.getId())) {
-            return; // never notify a user about liking their own post
+            return;
         }
 
-        // Avoid spam: if the post owner already has an UNREAD "liked your
-        // post" notification from this exact liker for this exact post,
-        // don't create another one (e.g. rapid unlike/re-like clicking).
-        boolean alreadyHasUnreadNotification = notificationRepository
-                .existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
-                        liker.getId(),
-                        postOwner.getId(),
-                        NotificationType.POST_LIKE,
-                        travelPlanId
-                );
+        boolean alreadyHasUnreadNotification =
+                notificationRepository
+                        .existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
+                                liker.getId(),
+                                postOwner.getId(),
+                                NotificationType.POST_LIKE,
+                                travelPlanId
+                        );
 
         if (alreadyHasUnreadNotification) {
             return;
@@ -175,11 +198,12 @@ public class NotificationService {
                 liker,
                 "❤️ " + liker.getName() + " liked your travel post.",
                 NotificationType.POST_LIKE,
-                travelPlanId // lets the frontend navigate to the relevant post
+                travelPlanId
         );
     }
 
     // ==================== Get notifications for logged-in user ====================
+
     public List<NotificationResponse> getMyNotifications() {
 
         User currentUser = getCurrentUser();
@@ -192,33 +216,50 @@ public class NotificationService {
     }
 
     // ==================== Unread count ====================
+
     public long getUnreadCount() {
+
         User currentUser = getCurrentUser();
-        return notificationRepository.countByReceiverIdAndIsReadFalse(currentUser.getId());
+
+        return notificationRepository
+                .countByReceiverIdAndIsReadFalse(currentUser.getId());
     }
 
     // ==================== Mark one as read ====================
+
     @Transactional
     public NotificationResponse markAsRead(Long notificationId) {
 
         User currentUser = getCurrentUser();
 
-        // findByIdAndReceiverId means a notification belonging to someone
-        // else simply "doesn't exist" for this user - even if they guess
-        // or forge a valid notification id from another account.
-        Notification notification = notificationRepository
-                .findByIdAndReceiverId(notificationId, currentUser.getId())
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        Notification notification =
+                notificationRepository
+                        .findByIdAndReceiverId(
+                                notificationId,
+                                currentUser.getId()
+                        )
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "Notification not found"
+                                )
+                        );
 
         notification.setIsRead(true);
 
-        return NotificationResponse.fromEntity(notificationRepository.save(notification));
+        return NotificationResponse.fromEntity(
+                notificationRepository.save(notification)
+        );
     }
 
     // ==================== Mark all as read ====================
+
     @Transactional
     public void markAllAsRead() {
+
         User currentUser = getCurrentUser();
-        notificationRepository.markAllAsReadForReceiver(currentUser.getId());
+
+        notificationRepository.markAllAsReadForReceiver(
+                currentUser.getId()
+        );
     }
 }
