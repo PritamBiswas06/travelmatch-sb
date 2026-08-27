@@ -120,17 +120,24 @@
 			<version>5.1.2</version>
 		</dependency>
 
-		<!-- web-push declares this as <scope>runtime</scope> in its own POM,
-		     so PushService.send()'s org.apache.http.HttpResponse return type
-		     is on the runtime classpath but NOT the compile classpath by
-		     default. WebPushService references that type directly, so it
-		     must be redeclared here at (default) compile scope - same
-		     version Maven already resolves transitively, so nothing else
-		     changes. -->
+		<!-- web-push declares these as <scope>runtime</scope> in its own POM,
+		     so types PushService.send() references directly (return type
+		     and thrown exceptions) are on the runtime classpath but NOT the
+		     compile classpath by default. WebPushService references them
+		     directly, so they must be redeclared here at (default) compile
+		     scope - same versions Maven already resolves transitively, so
+		     nothing else changes.
+		     - httpasyncclient (-> httpcore): org.apache.http.HttpResponse (return type)
+		     - jose4j: org.jose4j.lang.JoseException (declared thrown exception) -->
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpasyncclient</artifactId>
 			<version>4.1.5</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bitbucket.b_c</groupId>
+			<artifactId>jose4j</artifactId>
+			<version>0.7.9</version>
 		</dependency>
 
 		<!-- web-push's JCE provider for VAPID's ES256/ECDH crypto. Declared
