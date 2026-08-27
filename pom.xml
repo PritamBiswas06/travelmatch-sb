@@ -117,7 +117,7 @@
 		<dependency>
 			<groupId>nl.martijndwars</groupId>
 			<artifactId>web-push</artifactId>
-			<version>5.1.2</version>
+			<version>5.1.1</version>
 		</dependency>
 
 		<!-- web-push declares these as <scope>runtime</scope> in its own POM,
