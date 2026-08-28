@@ -13,11 +13,15 @@ import java.util.List;
 @AllArgsConstructor
 public class FeedPostResponse {
 
-    private Long id; // travelPlanId, used as postId too
+    private Long id;
 
     private Long userId;
     private String userName;
     private String userCity;
+
+    // Profile information used by the frontend for the profile avatar.
+    private String userGender;
+    private String profilePhotoUrl;
 
     private String fromLocation;
     private String destination;
@@ -28,17 +32,15 @@ public class FeedPostResponse {
     private String status;
     private LocalDateTime createdAt;
 
-    private Integer matchScore; // null if not computable (nothing comparable on either side)
+    private Integer matchScore;
 
-    // "Why this match?" breakdown, e.g. [{Destination, Excellent}, {Budget, Good}, ...].
-    // Empty when matchScore is null.
     private List<CompatibilityFactorResponse> matchFactors;
 
     private long likeCount;
     private long dislikeCount;
     private Integer shareCount;
 
-    private String currentUserReaction; // LIKE / DISLIKE / null
+    private String currentUserReaction;
 
-    private String matchRequestStatus; // NONE / PENDING / ACCEPTED / REJECTED
+    private String matchRequestStatus;
 }

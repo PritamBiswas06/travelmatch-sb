@@ -250,29 +250,79 @@ Keep an eye on your inbox for match requests 👀
         return posts;
     }
 
-    private FeedPostResponse toFeedPostResponse(TravelPlan plan, User currentUser, TravelPlan myLatestPlan) {
+    private String toPhotoDataUri(User user) {
 
-        long likeCount = postReactionRepository.countByTravelPlanAndReactionType(plan, "LIKE");
-        long dislikeCount = postReactionRepository.countByTravelPlanAndReactionType(plan, "DISLIKE");
+        if (user == null ||
+                user.getProfilePhoto() == null ||
+                user.getProfilePhoto().length == 0 ||
+                user.getProfilePhotoContentType() == null) {
 
-        String myReaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
-                .map(PostReaction::getReactionType)
-                .orElse(null);
+            return null;
+        }
 
-        String matchRequestStatus = matchRequestRepository
-                .findBySenderIdAndTravelPlanId(currentUser.getId(), plan.getId())
-                .map(MatchRequest::getStatus)
-                .orElse("NONE");
+        String base64 =
+                java.util.Base64
+                        .getEncoder()
+                        .encodeToString(user.getProfilePhoto());
 
-        CompatibilityService.CompatibilityResult compatibility = compatibilityService.calculate(
-                currentUser, myLatestPlan, plan.getUser(), plan
-        );
+        return "data:" +
+                user.getProfilePhotoContentType() +
+                ";base64," +
+                base64;
+    }
+    private FeedPostResponse toFeedPostResponse(
+            TravelPlan plan,
+            User currentUser,
+            TravelPlan myLatestPlan) {
+
+        long likeCount =
+                postReactionRepository.countByTravelPlanAndReactionType(
+                        plan,
+                        "LIKE"
+                );
+
+        long dislikeCount =
+                postReactionRepository.countByTravelPlanAndReactionType(
+                        plan,
+                        "DISLIKE"
+                );
+
+        String myReaction =
+                postReactionRepository
+                        .findByTravelPlanAndUser(plan, currentUser)
+                        .map(PostReaction::getReactionType)
+                        .orElse(null);
+
+        String matchRequestStatus =
+                matchRequestRepository
+                        .findBySenderIdAndTravelPlanId(
+                                currentUser.getId(),
+                                plan.getId()
+                        )
+                        .map(MatchRequest::getStatus)
+                        .orElse("NONE");
+
+        CompatibilityService.CompatibilityResult compatibility =
+                compatibilityService.calculate(
+                        currentUser,
+                        myLatestPlan,
+                        plan.getUser(),
+                        plan
+                );
+
+        User postOwner = plan.getUser();
 
         return FeedPostResponse.builder()
                 .id(plan.getId())
-                .userId(plan.getUser().getId())
-                .userName(plan.getUser().getName())
-                .userCity(plan.getUser().getCity())
+
+                .userId(postOwner.getId())
+                .userName(postOwner.getName())
+                .userCity(postOwner.getCity())
+
+                // NEW PROFILE INFORMATION
+                .userGender(postOwner.getGender())
+                .profilePhotoUrl(toPhotoDataUri(postOwner))
+
                 .fromLocation(plan.getFromLocation())
                 .destination(plan.getDestination())
                 .startDate(plan.getStartDate())
@@ -281,15 +331,59 @@ Keep an eye on your inbox for match requests 👀
                 .travelType(plan.getTravelType())
                 .status(plan.getStatus())
                 .createdAt(plan.getCreatedAt())
+
                 .matchScore(compatibility.score())
                 .matchFactors(compatibility.factors())
+
                 .likeCount(likeCount)
                 .dislikeCount(dislikeCount)
                 .shareCount(plan.getShareCount())
+
                 .currentUserReaction(myReaction)
                 .matchRequestStatus(matchRequestStatus)
+
                 .build();
     }
+//    private FeedPostResponse toFeedPostResponse(TravelPlan plan, User currentUser, TravelPlan myLatestPlan) {
+//
+//        long likeCount = postReactionRepository.countByTravelPlanAndReactionType(plan, "LIKE");
+//        long dislikeCount = postReactionRepository.countByTravelPlanAndReactionType(plan, "DISLIKE");
+//
+//        String myReaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
+//                .map(PostReaction::getReactionType)
+//                .orElse(null);
+//
+//        String matchRequestStatus = matchRequestRepository
+//                .findBySenderIdAndTravelPlanId(currentUser.getId(), plan.getId())
+//                .map(MatchRequest::getStatus)
+//                .orElse("NONE");
+//
+//        CompatibilityService.CompatibilityResult compatibility = compatibilityService.calculate(
+//                currentUser, myLatestPlan, plan.getUser(), plan
+//        );
+//
+//        return FeedPostResponse.builder()
+//                .id(plan.getId())
+//                .userId(plan.getUser().getId())
+//                .userName(plan.getUser().getName())
+//                .userCity(plan.getUser().getCity())
+//                .fromLocation(plan.getFromLocation())
+//                .destination(plan.getDestination())
+//                .startDate(plan.getStartDate())
+//                .endDate(plan.getEndDate())
+//                .budget(plan.getBudget())
+//                .travelType(plan.getTravelType())
+//                .status(plan.getStatus())
+//                .createdAt(plan.getCreatedAt())
+//                .matchScore(compatibility.score())
+//                .matchFactors(compatibility.factors())
+//                .likeCount(likeCount)
+//                .dislikeCount(dislikeCount)
+//                .shareCount(plan.getShareCount())
+//                .currentUserReaction(myReaction)
+//                .matchRequestStatus(matchRequestStatus)
+//                .build();
+//    }
 
     // ==================== REACTIONS ====================
 
