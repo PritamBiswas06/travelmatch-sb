@@ -153,7 +153,7 @@ public class MatchRequestService {
                 saved.getId()
         );
 
-        String reviewLink = "https://travelmatch49.netlify.app/requests";
+        String reviewLink = "https://tripmatch.fun/requests";
 
 // HTML Email
         String htmlEmail = """
@@ -323,8 +323,8 @@ Adventure starts with one decision 🌍
                     updated.getId()
             );
 
-            String senderChatLink = "https://travelmatch49.netlify.app/chat/" + receiver.getId();
-            String receiverChatLink = "https://travelmatch49.netlify.app/chat/" + sender.getId();
+            String senderChatLink = "https://tripmatch.fun/chat/" + receiver.getId();
+            String receiverChatLink = "https://tripmatch.fun/chat/" + sender.getId();
 
             // -------- HTML TEMPLATE FOR SENDER --------
             String senderHtml = """

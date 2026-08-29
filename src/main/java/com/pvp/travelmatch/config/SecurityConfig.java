@@ -59,7 +59,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOriginPatterns(List.of(
-                "https://travelmatch49.netlify.app"
+                "https://tripmatch.fun"
         ));
 
         configuration.setAllowedMethods(List.of(

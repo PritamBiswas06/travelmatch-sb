@@ -59,7 +59,7 @@ public class TravelPlanService {
 
         TravelPlan savedPlan = travelPlanRepository.save(plan);
 
-        String dashboardLink = "https://travelmatch49.netlify.app/dashboard";
+        String dashboardLink = "https://tripmatch.fun/dashboard";
 
         String htmlEmail = """
 <html>
