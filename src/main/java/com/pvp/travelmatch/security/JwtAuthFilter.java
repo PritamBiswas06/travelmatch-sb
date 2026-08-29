@@ -42,8 +42,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
+        System.out.println(
+                "JWT DEBUG | " +
+                        request.getMethod() +
+                        " " +
+                        request.getRequestURI() +
+                        " | Authorization present = " +
+                        (authHeader != null)
+        );
+
         // No Authorization header
-        if (authHeader == null || authHeader.trim().isEmpty()) {
+//        if (authHeader == null || authHeader.trim().isEmpty()) {
+//            filterChain.doFilter(request, response);
+//            return;
+//        }
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("JWT DEBUG | Authorization header missing");
             filterChain.doFilter(request, response);
             return;
         }
@@ -92,5 +107,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+
     }
 }
