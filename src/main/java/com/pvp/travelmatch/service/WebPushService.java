@@ -113,6 +113,8 @@ public class WebPushService {
             url = "/chat/" + relatedEntityId;
         } else if (type == NotificationType.POST_LIKE) {
             url = "/feed";
+        }else if (type == NotificationType.REVIEW_RECEIVED) {
+            url = "/notifications";
         }
 
         Map<String, Object> onActionClick = Map.of(

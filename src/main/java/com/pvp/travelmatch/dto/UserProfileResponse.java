@@ -47,4 +47,9 @@ public class UserProfileResponse {
     private boolean isOwnProfile;
 
     private List<ProfileTripResponse> upcomingTrips;
+    private double averageRating;
+
+    private long reviewCount;
+
+    private List<TravelerReviewResponse> reviews;
 }

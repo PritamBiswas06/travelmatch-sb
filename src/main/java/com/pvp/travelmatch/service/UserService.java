@@ -34,6 +34,7 @@ public class UserService {
     private final TravelPlanRepository travelPlanRepository;
     private final MatchRequestRepository matchRequestRepository;
     private final NotificationService notificationService;
+    private final TravelerReviewService travelerReviewService;
 
     // ==================== VIEW PROFILE ====================
 
@@ -98,6 +99,22 @@ public class UserService {
                 .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
                 .upcomingTrips(upcomingTrips)
+                .averageRating(
+                        travelerReviewService.getAverage(
+                                user.getId()
+                        )
+                )
+                .reviewCount(
+                        travelerReviewService.getCount(
+                                user.getId()
+                        )
+                )
+
+                .reviews(
+                        travelerReviewService.getForUser(
+                                user.getId()
+                        )
+                )
                 .build();
     }
 

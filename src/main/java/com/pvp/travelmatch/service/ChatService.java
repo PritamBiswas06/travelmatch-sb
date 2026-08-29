@@ -23,6 +23,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final TravelPartnerRepository travelPartnerRepository;
     private final NotificationService notificationService;
+    private final BlockedUserService blockedUserService;
 
     // 🔥 Send Message
     public Message sendMessage(Long receiverId, String content) {
@@ -38,6 +39,14 @@ public class ChatService {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new RuntimeException("Receiver not found"));
 
+        if (blockedUserService.isBlockedEitherWay(
+                sender.getId(),
+                receiver.getId())) {
+
+            throw new RuntimeException(
+                    "Messaging is unavailable because one of you has blocked the other"
+            );
+        }
         // ✅ Check if they are travel partners
         boolean isPartner = travelPartnerRepository.arePartners(sender, receiver);
 
@@ -80,6 +89,15 @@ public class ChatService {
 
         User otherUser = userRepository.findById(otherUserId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (blockedUserService.isBlockedEitherWay(
+                currentUser.getId(),
+                otherUser.getId())) {
+
+            throw new RuntimeException(
+                    "This conversation is unavailable because one of you has blocked the other"
+            );
+        }
 
         // Optional: also validate partner here (extra security)
         boolean isPartner = travelPartnerRepository.arePartners(currentUser, otherUser);

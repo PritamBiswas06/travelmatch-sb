@@ -25,6 +25,7 @@ public class MatchRequestService {
     private final TravelPartnerRepository travelPartnerRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final BlockedUserService blockedUserService;
 
 
     public List<?> findMatches(Long planId) {
@@ -37,7 +38,18 @@ public class MatchRequestService {
 
         // 🔹 3. Get other users' plans
         List<TravelPlan> otherPlans =
-                travelPlanRepository.findByUserIdNot(userId);
+                travelPlanRepository
+                        .findByUserIdNot(userId)
+                        .stream()
+                        .filter(plan ->
+                                plan.getUser() != null &&
+                                        !blockedUserService
+                                                .isBlockedEitherWay(
+                                                        userId,
+                                                        plan.getUser().getId()
+                                                )
+                        )
+                        .toList();
 
         // 🔹 4. Convert to AI format
         Map<String, Object> targetUser = convertToAIUser(targetPlan);
@@ -101,6 +113,15 @@ public class MatchRequestService {
 
         if (sender.getId().equals(receiver.getId())) {
             throw new RuntimeException("You cannot send request to yourself");
+        }
+
+        if (blockedUserService.isBlockedEitherWay(
+                sender.getId(),
+                receiver.getId())) {
+
+            throw new RuntimeException(
+                    "You cannot send a match request to this user"
+            );
         }
 
         // 🔥 CHECK DUPLICATE (unique constraint is on sender_id + travel_plan_id,

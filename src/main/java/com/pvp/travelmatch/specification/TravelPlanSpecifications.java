@@ -4,7 +4,7 @@ import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.entity.TravelPlan;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
-
+import com.pvp.travelmatch.entity.BlockedUser;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +25,39 @@ public final class TravelPlanSpecifications {
             // Base feed rules (unchanged from the original findFeedPlans query):
             // other users' active, non-expired trips.
             predicates.add(cb.notEqual(root.get("user").get("id"), viewerId));
+
+            var blockedSubquery =
+                    query.subquery(Long.class);
+
+            var blockedRoot =
+                    blockedSubquery.from(BlockedUser.class);
+
+            blockedSubquery.select(
+                    cb.literal(1L)
+            );
+
+            blockedSubquery.where(
+                    cb.equal(
+                            blockedRoot
+                                    .get("blocker")
+                                    .get("id"),
+                            viewerId
+                    ),
+
+                    cb.equal(
+                            blockedRoot
+                                    .get("blockedUser")
+                                    .get("id"),
+                            root.get("user").get("id")
+                    )
+            );
+
+            predicates.add(
+                    cb.not(
+                            cb.exists(blockedSubquery)
+                    )
+            );
+
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
             predicates.add(cb.greaterThanOrEqualTo(root.get("endDate"), today));
 
