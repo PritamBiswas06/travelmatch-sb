@@ -34,6 +34,19 @@ public class TravelerReviewController {
                 .getForUser(userId);
     }
 
+    @GetMapping("/user/{userId}/eligibility")
+    public Map<String, Object> eligibility(
+            @PathVariable Long userId) {
+
+        List<Long> travelPlanIds =
+                reviewService.getEligibleTravelPlanIds(userId);
+
+        return Map.of(
+                "eligible", !travelPlanIds.isEmpty(),
+                "travelPlanIds", travelPlanIds
+        );
+    }
+
     @GetMapping("/user/{userId}/summary")
     public Map<String, Object> summary(
             @PathVariable Long userId) {

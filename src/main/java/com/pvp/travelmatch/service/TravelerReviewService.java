@@ -214,6 +214,46 @@ public class TravelerReviewService {
                 .fromEntity(saved);
     }
 
+    /**
+     * Returns completed trips on which the authenticated user and the
+     * reviewed traveler are confirmed partners and for which a review has
+     * not already been submitted by the authenticated user.
+     */
+    public List<Long> getEligibleTravelPlanIds(Long reviewedUserId) {
+        User reviewer = getCurrentUser();
+
+        User reviewedUser = userRepository.findById(reviewedUserId)
+                .orElseThrow(() -> new RuntimeException("Traveler not found"));
+
+        if (reviewer.getId().equals(reviewedUser.getId())) {
+            return List.of();
+        }
+
+        return travelPartnerRepository
+                .findByUserOneOrUserTwo(reviewer, reviewer)
+                .stream()
+                .filter(partner -> {
+                    User otherUser = partner.getUserOne().getId().equals(reviewer.getId())
+                            ? partner.getUserTwo()
+                            : partner.getUserOne();
+
+                    return otherUser.getId().equals(reviewedUser.getId());
+                })
+                .map(com.pvp.travelmatch.entity.TravelPartner::getTravelPlan)
+                .filter(java.util.Objects::nonNull)
+                .filter(plan -> "COMPLETED".equalsIgnoreCase(plan.getStatus()))
+                .filter(plan -> plan.getEndDate() != null && !plan.getEndDate().isAfter(LocalDate.now()))
+                .map(TravelPlan::getId)
+                .filter(planId -> !reviewRepository
+                        .existsByReviewerIdAndReviewedUserIdAndTravelPlanId(
+                                reviewer.getId(),
+                                reviewedUser.getId(),
+                                planId
+                        ))
+                .distinct()
+                .toList();
+    }
+
     public List<TravelerReviewResponse>
     getForUser(Long userId) {
 
