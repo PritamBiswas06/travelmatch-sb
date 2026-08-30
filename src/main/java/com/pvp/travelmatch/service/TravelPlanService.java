@@ -59,7 +59,7 @@ public class TravelPlanService {
 
         TravelPlan savedPlan = travelPlanRepository.save(plan);
 
-        String dashboardLink = "https://tripmatch.fun/dashboard";
+        String dashboardLink = "https://www.tripmatch.fun/dashboard";
 
         String htmlEmail = """
 <html>
