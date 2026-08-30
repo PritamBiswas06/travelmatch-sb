@@ -59,8 +59,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOriginPatterns(List.of(
-                "https://tripmatch.fun/"
-//                "https://www.tripmatch.fun"
+                "https://tripmatch.fun/",
+                "https://www.tripmatch.fun"
         ));
 
         configuration.setAllowedMethods(List.of(
