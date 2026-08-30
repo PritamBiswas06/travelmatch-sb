@@ -3,6 +3,7 @@ package com.pvp.travelmatch.service;
 import com.pvp.travelmatch.entity.*;
 import com.pvp.travelmatch.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,6 +27,12 @@ public class MatchRequestService {
     private final EmailService emailService;
     private final NotificationService notificationService;
     private final BlockedUserService blockedUserService;
+
+    // Not final/constructor-injected on purpose: Spring populates @Value
+    // fields after construction regardless of how the bean was built, which
+    // keeps this independent of Lombok's generated constructor.
+    @Value("${app.frontend-url:https://tripmatch.fun}")
+    private String frontendUrl;
 
 
     public List<?> findMatches(Long planId) {
@@ -174,7 +181,7 @@ public class MatchRequestService {
                 saved.getId()
         );
 
-        String reviewLink = "https://www.tripmatch.fun/requests";
+        String reviewLink = frontendUrl + "/requests";
 
 // HTML Email
         String htmlEmail = """
@@ -243,72 +250,6 @@ Adventure starts with one decision 🌍
     }
 
     // Accept / Reject
-//    public MatchRequest updateStatus(Long requestId, String status) {
-//
-//        MatchRequest request = matchRequestRepository.findById(requestId)
-//                .orElseThrow(() -> new RuntimeException("Request not found"));
-//
-//        request.setStatus(status);
-//
-//        MatchRequest updated = matchRequestRepository.save(request);
-//
-//        // 🔥 If ACCEPTED → create TravelPartner
-    ////        if (status.equals("ACCEPTED")) {
-    ////
-    ////            TravelPartner partner = TravelPartner.builder()
-    ////                    .userOne(request.getSender())
-    ////                    .userTwo(request.getReceiver())
-    ////                    .travelPlan(request.getTravelPlan())
-    ////                    .createdAt(LocalDateTime.now())
-    ////                    .build();
-    ////
-    ////            travelPartnerRepository.save(partner);
-    ////        }
-//
-//
-//
-//        if (status.equals("ACCEPTED")) {
-//
-//            TravelPartner partner = TravelPartner.builder()
-//                    .userOne(request.getSender())
-//                    .userTwo(request.getReceiver())
-//                    .travelPlan(request.getTravelPlan())
-//                    .createdAt(LocalDateTime.now())
-//                    .build();
-//
-//            travelPartnerRepository.save(partner);
-//
-//            User sender = request.getSender();
-//            User receiver = request.getReceiver();
-//            String destination = request.getTravelPlan().getDestination();
-//
-//            // EMAIL TO SENDER (The one who asked)
-//            String senderChatLink = "http://localhost:4200/chat/" + receiver.getId();
-//            String senderBody = "Pack your bags, " + sender.getName() + "!\n\n" +
-//                    "Great news! " + receiver.getName() + " has accepted your request to travel to " + destination + ".\n\n" +
-//                    "Your journey together starts now. Say hello and start planning the details:\n" +
-//                    senderChatLink + "\n\n" +
-//                    "Adventure is better together,\n" +
-//                    "The TravelMatch Team ✈";
-//
-//            emailService.sendEmail(sender.getEmail(), "Request Accepted! 🎒 Destination: " + destination, senderBody);
-//
-//            // --- EMAIL TO RECEIVER (The one who hosted/posted) ---
-//            String receiverChatLink = "http://localhost:4200/chat/" + sender.getId();
-//            String receiverBody = "It's a Match, " + receiver.getName() + "!\n\n" +
-//                    "You’ve officially confirmed " + sender.getName() + " as your travel partner for " + destination + ".\n\n" +
-//                    "Don't leave them hanging! Reach out and break the ice:\n" +
-//                    receiverChatLink + "\n\n" +
-//                    "Wishing you an incredible trip,\n" +
-//                    "The TravelMatch Team ✈";
-//
-//            emailService.sendEmail(receiver.getEmail(), "New Travel Partner Confirmed! 🤝", receiverBody);
-//        }
-//
-//        return updated;
-//    }
-
-
     public MatchRequest updateStatus(Long requestId, String status) {
 
         MatchRequest request = matchRequestRepository.findById(requestId)
@@ -344,8 +285,8 @@ Adventure starts with one decision 🌍
                     updated.getId()
             );
 
-            String senderChatLink = "https://www.tripmatch.fun/chat/" + receiver.getId();
-            String receiverChatLink = "https://www.tripmatch.fun/chat/" + sender.getId();
+            String senderChatLink = frontendUrl + "/chat/" + receiver.getId();
+            String receiverChatLink = frontendUrl + "/chat/" + sender.getId();
 
             // -------- HTML TEMPLATE FOR SENDER --------
             String senderHtml = """

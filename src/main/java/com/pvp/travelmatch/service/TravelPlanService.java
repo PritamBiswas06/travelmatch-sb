@@ -12,6 +12,7 @@ import com.pvp.travelmatch.repository.*;
 import com.pvp.travelmatch.specification.TravelPlanSpecifications;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,10 @@ public class TravelPlanService {
     private final NotificationService notificationService;
     private final CompatibilityService compatibilityService;
 
+    @Value("${app.frontend-url:https://tripmatch.fun}")
+    private String frontendUrl;
+
+
     public TravelPlan createPlan(TravelPlanRequest request) {
 
         String email = (String) SecurityContextHolder.getContext()
@@ -59,7 +64,7 @@ public class TravelPlanService {
 
         TravelPlan savedPlan = travelPlanRepository.save(plan);
 
-        String dashboardLink = "https://www.tripmatch.fun/dashboard";
+        String dashboardLink = frontendUrl + "/dashboard";
 
         String htmlEmail = """
 <html>

@@ -1,0 +1,24 @@
+# Build output
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local secrets/config overrides - never commit real credentials.
+# application-local.properties itself IS committed (it only contains safe
+# localhost defaults with env-var overrides) - this only blocks personal
+# overrides layered on top of it.
+.env
+.env.*
+application-local.properties.local
+application-*.local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

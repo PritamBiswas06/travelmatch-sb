@@ -60,7 +60,8 @@ public class SecurityConfig {
 
         configuration.setAllowedOriginPatterns(List.of(
                 "https://tripmatch.fun/",
-                "https://www.tripmatch.fun"
+                "https://www.tripmatch.fun",
+                "http://localhost:4200"
         ));
 
         configuration.setAllowedMethods(List.of(
