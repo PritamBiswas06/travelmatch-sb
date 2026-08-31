@@ -7,6 +7,10 @@ import com.pvp.travelmatch.entity.MatchRequest;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
 import com.pvp.travelmatch.repository.MatchRequestRepository;
+import com.pvp.travelmatch.repository.PostReactionRepository;
+import com.pvp.travelmatch.repository.SavedTravelPlanRepository;
+import com.pvp.travelmatch.repository.TravelCommentRepository;
+import com.pvp.travelmatch.repository.TravelMemoryRepository;
 import com.pvp.travelmatch.repository.TravelPlanRepository;
 import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +39,10 @@ public class UserService {
     private final MatchRequestRepository matchRequestRepository;
     private final NotificationService notificationService;
     private final TravelerReviewService travelerReviewService;
+    private final PostReactionRepository postReactionRepository;
+    private final SavedTravelPlanRepository savedTravelPlanRepository;
+    private final TravelCommentRepository travelCommentRepository;
+    private final TravelMemoryRepository travelMemoryRepository;
 
     // ==================== VIEW PROFILE ====================
 
@@ -63,18 +71,33 @@ public class UserService {
             }
         }
 
-        List<ProfileTripResponse> upcomingTrips = travelPlanRepository.findByUser(targetUser).stream()
-                .filter(plan -> "ACTIVE".equalsIgnoreCase(plan.getStatus())
-                        && plan.getEndDate() != null
-                        && !plan.getEndDate().isBefore(LocalDate.now()))
-                .sorted(Comparator.comparing(TravelPlan::getStartDate))
+        List<TravelPlan> userPlans = travelPlanRepository.findByUser(targetUser).stream()
+                .sorted(Comparator.comparing(TravelPlan::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        // All public travel plans are shown on the profile, including completed
+        // trips, so a profile behaves like a social travel timeline.
+        List<ProfileTripResponse> posts = userPlans.stream()
                 .map(plan -> toProfileTripResponse(plan, currentUser, isOwnProfile))
                 .toList();
 
-        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips);
+        List<ProfileTripResponse> upcomingTrips = userPlans.stream()
+                .filter(plan -> "ACTIVE".equalsIgnoreCase(plan.getStatus())
+                        && plan.getEndDate() != null
+                        && !plan.getEndDate().isBefore(LocalDate.now()))
+                .sorted(Comparator.comparing(TravelPlan::getStartDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(plan -> toProfileTripResponse(plan, currentUser, isOwnProfile))
+                .toList();
+
+        List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories =
+                travelMemoryRepository.findByUserIdOrderByCreatedAtDesc(targetUser.getId()).stream()
+                        .map(com.pvp.travelmatch.dto.TravelMemoryResponse::fromEntity)
+                        .toList();
+
+        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips, posts, travelMemories);
     }
 
-    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips) {
+    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips, List<ProfileTripResponse> posts, List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories) {
         return UserProfileResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
@@ -99,6 +122,8 @@ public class UserService {
                 .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
                 .upcomingTrips(upcomingTrips)
+                .posts(posts)
+                .travelMemories(travelMemories)
                 .averageRating(
                         travelerReviewService.getAverage(
                                 user.getId()
@@ -126,6 +151,10 @@ public class UserService {
                 .map(MatchRequest::getStatus)
                 .orElse("NONE");
 
+        String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
+                .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)
+                .orElse(null);
+
         return ProfileTripResponse.builder()
                 .id(plan.getId())
                 .fromLocation(plan.getFromLocation())
@@ -135,6 +164,12 @@ public class UserService {
                 .budget(plan.getBudget())
                 .travelType(plan.getTravelType())
                 .status(plan.getStatus())
+                .createdAt(plan.getCreatedAt())
+                .likeCount(postReactionRepository.countByTravelPlanAndReactionType(plan, "LIKE"))
+                .shareCount(plan.getShareCount() == null ? 0 : plan.getShareCount())
+                .commentCount(travelCommentRepository.countByTravelPlanId(plan.getId()))
+                .currentUserReaction(reaction)
+                .currentUserSaved(savedTravelPlanRepository.existsByUserIdAndTravelPlanId(currentUser.getId(), plan.getId()))
                 .matchRequestStatus(matchRequestStatus)
                 .build();
     }

@@ -38,6 +38,9 @@ public class TravelPlanService {
     private final TravelPartnerRepository travelPartnerRepository;
     private final NotificationService notificationService;
     private final CompatibilityService compatibilityService;
+    private final SavedTravelPlanRepository savedTravelPlanRepository;
+    private final TravelCommentRepository travelCommentRepository;
+    private final TravelMemoryRepository travelMemoryRepository;
 
     @Value("${app.frontend-url:https://tripmatch.fun}")
     private String frontendUrl;
@@ -345,6 +348,8 @@ Keep an eye on your inbox for match requests 👀
                 .shareCount(plan.getShareCount())
 
                 .currentUserReaction(myReaction)
+                .currentUserSaved(savedTravelPlanRepository.existsByUserIdAndTravelPlanId(currentUser.getId(), plan.getId()))
+                .commentCount(travelCommentRepository.countByTravelPlanId(plan.getId()))
                 .matchRequestStatus(matchRequestStatus)
 
                 .build();
@@ -503,6 +508,9 @@ Keep an eye on your inbox for match requests 👀
         postReactionRepository.deleteByTravelPlan(plan);
         matchRequestRepository.deleteByTravelPlan(plan);
         travelPartnerRepository.deleteByTravelPlan(plan);
+        travelCommentRepository.deleteByTravelPlan(plan);
+        travelMemoryRepository.deleteByTravelPlan(plan);
+        savedTravelPlanRepository.deleteByTravelPlan(plan);
 
         travelPlanRepository.delete(plan);
     }

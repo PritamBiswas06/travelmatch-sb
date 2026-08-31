@@ -14,6 +14,8 @@ public enum NotificationType {
 
     POST_LIKE,
 
+    TRAVEL_COMMENT,
+
     REVIEW_RECEIVED,
 
     SYSTEM

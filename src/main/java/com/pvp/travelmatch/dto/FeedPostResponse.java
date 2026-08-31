@@ -42,5 +42,8 @@ public class FeedPostResponse {
 
     private String currentUserReaction;
 
+    private boolean currentUserSaved;
+    private long commentCount;
+
     private String matchRequestStatus;
 }

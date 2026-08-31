@@ -225,6 +225,25 @@ public class NotificationService {
                 .countByReceiverIdAndIsReadFalse(currentUser.getId());
     }
 
+    // ==================== Delete one ====================
+
+    @Transactional
+    public void delete(Long notificationId) {
+        User currentUser = getCurrentUser();
+
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Notification not found"));
+
+        if (!notification.getReceiver().getId().equals(currentUser.getId())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "You can only delete your own notifications");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
     // ==================== Mark one as read ====================
 
     @Transactional

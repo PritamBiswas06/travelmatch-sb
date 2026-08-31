@@ -20,6 +20,12 @@ public class ProfileTripResponse {
     private Double budget;
     private String travelType;
     private String status;
+    private java.time.LocalDateTime createdAt;
+    private long likeCount;
+    private long shareCount;
+    private long commentCount;
+    private String currentUserReaction;
+    private boolean currentUserSaved;
 
     // NONE / PENDING / ACCEPTED / REJECTED — null when viewing your own profile,
     // since you can't send yourself a match request.
