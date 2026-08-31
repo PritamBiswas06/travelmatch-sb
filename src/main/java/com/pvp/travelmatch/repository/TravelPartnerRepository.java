@@ -3,6 +3,8 @@ package com.pvp.travelmatch.repository;
 import com.pvp.travelmatch.entity.TravelPartner;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -20,4 +22,6 @@ public interface TravelPartnerRepository extends JpaRepository<TravelPartner, Lo
     void deleteByTravelPlan(TravelPlan travelPlan);
     List<TravelPartner> findByUserOneOrUserTwo(User userOne, User userTwo);
     List<TravelPartner> findByTravelPlan(TravelPlan travelPlan);
+
+    Page<TravelPartner> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

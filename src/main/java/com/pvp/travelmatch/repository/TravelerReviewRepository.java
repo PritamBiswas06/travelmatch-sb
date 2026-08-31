@@ -1,28 +1,20 @@
 package com.pvp.travelmatch.repository;
 
 import com.pvp.travelmatch.entity.TravelerReview;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
-public interface TravelerReviewRepository
-        extends JpaRepository<TravelerReview, Long> {
+public interface TravelerReviewRepository extends JpaRepository<TravelerReview, Long> {
 
     boolean existsByReviewerIdAndReviewedUserIdAndTravelPlanId(
-            Long reviewerId,
-            Long reviewedUserId,
-            Long travelPlanId
-    );
+            Long reviewerId, Long reviewedUserId, Long travelPlanId);
 
-    List<TravelerReview>
-    findByReviewedUserIdOrderByCreatedAtDesc(
-            Long reviewedUserId
-    );
-
-    long countByReviewedUserId(
-            Long reviewedUserId
-    );
+    List<TravelerReview> findByReviewedUserIdOrderByCreatedAtDesc(Long reviewedUserId);
+    long countByReviewedUserId(Long reviewedUserId);
 
     @Query("""
         SELECT COALESCE(AVG(r.rating), 0)
@@ -30,4 +22,6 @@ public interface TravelerReviewRepository
         WHERE r.reviewedUser.id = :userId
     """)
     Double averageRating(Long userId);
+
+    Page<TravelerReview> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }
