@@ -29,8 +29,10 @@ public class ReportService {
 
     private final TravelPlanRepository travelPlanRepository;
 
-    @Value("${TRAVELMATCH_ADMIN_EMAILS:}")
-    private String adminEmails;
+    private final AdminEmailService adminEmailService;
+
+//    @Value("${TRAVELMATCH_ADMIN_EMAILS:}")
+//    private String adminEmails;
 
     private User getCurrentUser() {
 
@@ -138,19 +140,7 @@ public class ReportService {
 
         User currentUser = getCurrentUser();
 
-        boolean isAdmin =
-                Arrays.stream(
-                                adminEmails.split(",")
-                        )
-                        .map(String::trim)
-                        .filter(email -> !email.isBlank())
-                        .anyMatch(email ->
-                                email.equalsIgnoreCase(
-                                        currentUser.getEmail()
-                                )
-                        );
-
-        if (!isAdmin) {
+        if (!adminEmailService.isAdminEmail(currentUser.getEmail())) {
 
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
