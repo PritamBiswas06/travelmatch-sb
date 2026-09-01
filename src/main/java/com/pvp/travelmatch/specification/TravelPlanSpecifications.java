@@ -85,6 +85,14 @@ public final class TravelPlanSpecifications {
                     predicates.add(cb.lessThanOrEqualTo(root.get("budget"), filter.getMaxBudget()));
                 }
 
+                if (filter.getMinAge() != null) predicates.add(cb.greaterThanOrEqualTo(root.get("user").get("age"), filter.getMinAge()));
+                if (filter.getMaxAge() != null) predicates.add(cb.lessThanOrEqualTo(root.get("user").get("age"), filter.getMaxAge()));
+                if (hasText(filter.getTravelStyle())) predicates.add(cb.like(cb.lower(root.get("user").get("travelStyle")), "%"+filter.getTravelStyle().trim().toLowerCase()+"%"));
+                if (hasText(filter.getTravelInterest())) predicates.add(cb.like(cb.lower(root.get("user").get("travelInterests")), "%"+filter.getTravelInterest().trim().toLowerCase()+"%"));
+                if (hasText(filter.getLanguage())) predicates.add(cb.like(cb.lower(root.get("user").get("languages")), "%"+filter.getLanguage().trim().toLowerCase()+"%"));
+                if (hasText(filter.getCountry())) predicates.add(cb.equal(cb.lower(root.get("user").get("country")), filter.getCountry().trim().toLowerCase()));
+                if (hasText(filter.getCity())) predicates.add(cb.equal(cb.lower(root.get("user").get("city")), filter.getCity().trim().toLowerCase()));
+
                 if (hasText(filter.getTravelType())) {
                     predicates.add(cb.equal(
                             cb.lower(root.get("travelType")),

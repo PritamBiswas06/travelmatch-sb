@@ -1,0 +1,1 @@
+package com.pvp.travelmatch.dto; import jakarta.validation.constraints.NotBlank; import lombok.*; @Data @NoArgsConstructor @AllArgsConstructor public class PaymentVerificationRequest { @NotBlank private String orderId; @NotBlank private String paymentId; @NotBlank private String signature; }

@@ -43,6 +43,7 @@ public class UserService {
     private final SavedTravelPlanRepository savedTravelPlanRepository;
     private final TravelCommentRepository travelCommentRepository;
     private final TravelMemoryRepository travelMemoryRepository;
+    private final MonetizationService monetizationService;
 
     // ==================== VIEW PROFILE ====================
 
@@ -64,6 +65,7 @@ public class UserService {
         // - Wrapped so a notification failure can never break profile viewing.
         if (!isOwnProfile) {
             try {
+                monetizationService.recordProfileView(targetUser.getId());
                 notificationService.createProfileViewNotification(targetUser, currentUser);
             } catch (Exception e) {
                 // Deliberately swallow: viewing a profile must always succeed
@@ -121,6 +123,7 @@ public class UserService {
                 .linkedinUrl(user.getLinkedinUrl())
                 .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
+                .premiumUser(monetizationService.isPremium(user))
                 .upcomingTrips(upcomingTrips)
                 .posts(posts)
                 .travelMemories(travelMemories)

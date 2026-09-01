@@ -45,6 +45,7 @@ public class UserProfileResponse {
     // True when the profile belongs to the currently authenticated user.
     @JsonProperty("isOwnProfile")
     private boolean isOwnProfile;
+    private boolean premiumUser;
 
     private List<ProfileTripResponse> upcomingTrips;
     private List<ProfileTripResponse> posts;

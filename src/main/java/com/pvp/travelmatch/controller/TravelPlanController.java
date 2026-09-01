@@ -47,7 +47,10 @@ public class TravelPlanController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String travelType,
-            @RequestParam(required = false) Integer minMatchScore
+            @RequestParam(required = false) Integer minMatchScore,
+            @RequestParam(required = false) Integer minAge, @RequestParam(required = false) Integer maxAge,
+            @RequestParam(required = false) String travelStyle, @RequestParam(required = false) String travelInterest,
+            @RequestParam(required = false) String language, @RequestParam(required = false) String country, @RequestParam(required = false) String city
     ) {
         FeedFilterRequest filter = FeedFilterRequest.builder()
                 .destination(destination)
@@ -57,7 +60,7 @@ public class TravelPlanController {
                 .startDate(startDate)
                 .endDate(endDate)
                 .travelType(travelType)
-                .minMatchScore(minMatchScore)
+                .minMatchScore(minMatchScore).minAge(minAge).maxAge(maxAge).travelStyle(travelStyle).travelInterest(travelInterest).language(language).country(country).city(city)
                 .build();
 
         return travelPlanService.getFeed(sort, filter);

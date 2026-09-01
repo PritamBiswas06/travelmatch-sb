@@ -30,6 +30,7 @@ public class AdminService {
     private final MatchRequestRepository matchRequestRepository;
     private final TravelPartnerRepository partnerRepository;
     private final AuditLogRepository auditLogRepository;
+    private final MonetizationService monetizationService;
 
 
     // ============================================================
@@ -76,7 +77,15 @@ public class AdminService {
                 matchRequestRepository.count(),
 
                 // 10. Total Travel Partners
-                partnerRepository.count()
+                partnerRepository.count(),
+                ((Number)monetizationService.adminMetrics().get("premiumUsers")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("activeSubscriptions")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("totalPayments")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("successfulPayments")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("failedPayments")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("totalBoosts")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("activeBoosts")).longValue(),
+                ((Number)monetizationService.adminMetrics().get("revenuePaise")).longValue()
         );
     }
 

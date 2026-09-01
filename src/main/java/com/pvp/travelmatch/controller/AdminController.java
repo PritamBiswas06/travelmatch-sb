@@ -3,6 +3,7 @@ package com.pvp.travelmatch.controller;
 import com.pvp.travelmatch.dto.*;
 import com.pvp.travelmatch.entity.ReportStatus;
 import com.pvp.travelmatch.service.AdminService;
+import com.pvp.travelmatch.service.MonetizationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final MonetizationService monetizationService;
 
     @GetMapping("/dashboard")
     public AdminDashboardResponse dashboard() {
@@ -109,6 +111,9 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size) {
         return adminService.partners(page, size);
     }
+
+    @GetMapping("/monetization/metrics") public java.util.Map<String,Object> monetizationMetrics(){ return monetizationService.adminMetrics(); }
+    @GetMapping("/monetization/payments") public Page<AdminPaymentResponse> monetizationPayments(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){ return monetizationService.adminPayments(page,size); }
 
     @GetMapping("/audit-logs")
     public Page<AdminAuditLogResponse> auditLogs(

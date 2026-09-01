@@ -4,10 +4,7 @@ import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
-import com.pvp.travelmatch.entity.MatchRequest;
-import com.pvp.travelmatch.entity.PostReaction;
-import com.pvp.travelmatch.entity.TravelPlan;
-import com.pvp.travelmatch.entity.User;
+import com.pvp.travelmatch.entity.*;
 import com.pvp.travelmatch.repository.*;
 import com.pvp.travelmatch.specification.TravelPlanSpecifications;
 import jakarta.transaction.Transactional;
@@ -41,6 +38,8 @@ public class TravelPlanService {
     private final SavedTravelPlanRepository savedTravelPlanRepository;
     private final TravelCommentRepository travelCommentRepository;
     private final TravelMemoryRepository travelMemoryRepository;
+    private final MonetizationService monetizationService;
+    private final BoostedTravelPlanRepository boostedTravelPlanRepository;
 
     @Value("${app.frontend-url:https://tripmatch.fun}")
     private String frontendUrl;
@@ -217,6 +216,8 @@ Keep an eye on your inbox for match requests 👀
     public List<FeedPostResponse> getFeed(String sortBy, FeedFilterRequest filter) {
 
         User currentUser = getCurrentUser();
+        boolean premium = monetizationService.isPremium(currentUser);
+        if (filter != null && (filter.getMinAge()!=null || filter.getMaxAge()!=null || filter.getTravelStyle()!=null || filter.getTravelInterest()!=null || filter.getLanguage()!=null || filter.getCountry()!=null || filter.getCity()!=null) && !premium) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Premium subscription required for advanced filters");
 
         // All destination/location/budget/date/travelType filters are applied
         // at the database level via a Specification, so no unfiltered
@@ -246,6 +247,7 @@ Keep an eye on your inbox for match requests 👀
                     .collect(java.util.stream.Collectors.toList());
         }
 
+        posts.sort(Comparator.comparingDouble((FeedPostResponse p)->(p.isBoosted()?1000.0*(p.getBoostMultiplier()==null?1.0:p.getBoostMultiplier()):0)+(p.isPremiumUser()?50:0)+p.getLikeCount()*0.1).reversed().thenComparing(FeedPostResponse::getCreatedAt,Comparator.reverseOrder()));
         if ("popular".equalsIgnoreCase(sortBy)) {
             posts.sort(Comparator.comparingLong(FeedPostResponse::getLikeCount).reversed());
         } else if ("match".equalsIgnoreCase(sortBy)) {
@@ -351,7 +353,9 @@ Keep an eye on your inbox for match requests 👀
                 .currentUserSaved(savedTravelPlanRepository.existsByUserIdAndTravelPlanId(currentUser.getId(), plan.getId()))
                 .commentCount(travelCommentRepository.countByTravelPlanId(plan.getId()))
                 .matchRequestStatus(matchRequestStatus)
-
+                .premiumUser(monetizationService.isPremium(postOwner))
+                .boosted(boostedTravelPlanRepository.findActive(plan.getId(), LocalDateTime.now()).isPresent())
+                .boostMultiplier(boostedTravelPlanRepository.findActive(plan.getId(), LocalDateTime.now()).map(BoostedTravelPlan::getMultiplier).orElse(null))
                 .build();
     }
 //    private FeedPostResponse toFeedPostResponse(TravelPlan plan, User currentUser, TravelPlan myLatestPlan) {

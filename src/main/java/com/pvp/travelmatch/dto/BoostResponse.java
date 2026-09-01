@@ -1,0 +1,1 @@
+package com.pvp.travelmatch.dto; import lombok.*; import java.time.LocalDateTime; @Data @Builder @NoArgsConstructor @AllArgsConstructor public class BoostResponse { private Long travelPlanId; private boolean active; private double multiplier; private LocalDateTime startedAt; private LocalDateTime expiresAt; }

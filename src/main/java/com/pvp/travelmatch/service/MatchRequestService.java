@@ -9,6 +9,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +28,7 @@ public class MatchRequestService {
     private final TravelPartnerRepository travelPartnerRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final MonetizationService monetizationService;
     private final BlockedUserService blockedUserService;
 
     // Not final/constructor-injected on purpose: Spring populates @Value
@@ -112,6 +115,10 @@ public class MatchRequestService {
 
         User sender = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!monetizationService.isPremium(sender) && sender.getRole() != Role.ADMIN) {
+            long used = matchRequestRepository.countBySenderIdAndCreatedAtAfter(sender.getId(), LocalDateTime.now().minusDays(30));
+            if (used >= monetizationService.freeRequestLimit()) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Free users can send up to " + monetizationService.freeRequestLimit() + " match requests in 30 days. Upgrade to Premium for unlimited requests.");
+        }
 
         TravelPlan plan = travelPlanRepository.findById(travelPlanId)
                 .orElseThrow(() -> new RuntimeException("Travel plan not found"));

@@ -46,4 +46,5 @@ public class FeedPostResponse {
     private long commentCount;
 
     private String matchRequestStatus;
+    private boolean premiumUser; private boolean boosted; private Double boostMultiplier;
 }

@@ -16,5 +16,5 @@ public class AdminDashboardResponse {
     private long pendingReports;
     private long totalReviews;
     private long totalMatchRequests;
-    private long totalPartners;
+    private long totalPartners; private long premiumUsers; private long activeSubscriptions; private long totalPayments; private long successfulPayments; private long failedPayments; private long totalBoosts; private long activeBoosts; private long revenuePaise;
 }

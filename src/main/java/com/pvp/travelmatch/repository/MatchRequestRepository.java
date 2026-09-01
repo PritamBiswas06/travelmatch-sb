@@ -21,4 +21,5 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
 
     Page<MatchRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
     long countByStatus(String status);
+    long countBySenderIdAndCreatedAtAfter(Long senderId, java.time.LocalDateTime after);
 }

@@ -1,0 +1,1 @@
+package com.pvp.travelmatch.dto; import lombok.*; import java.time.LocalDateTime; @Data @Builder @NoArgsConstructor @AllArgsConstructor public class SubscriptionResponse { private String plan; private String status; private boolean premium; private LocalDateTime startDate; private LocalDateTime endDate; private boolean autoRenew; }

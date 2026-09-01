@@ -1,0 +1,1 @@
+package com.pvp.travelmatch.dto; import lombok.*; import java.time.LocalDateTime; @Data @NoArgsConstructor @AllArgsConstructor public class ProfileViewResponse { private Long userId; private String name; private String username; private String profilePhotoUrl; private String city; private LocalDateTime viewedAt; }

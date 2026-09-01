@@ -1,0 +1,1 @@
+package com.pvp.travelmatch.dto; import lombok.*; @Data @NoArgsConstructor @AllArgsConstructor public class PaymentOrderResponse { private String orderId; private Long amount; private String currency; private String keyId; private String type; private Long referenceId; }
