@@ -17,8 +17,21 @@ public class JwtService {
     @Value("${jwt.secret:thisisaverysecuresecretkeythisisaverysecuresecretkey}")
     private String secret;
 
+    /*
+     * JWT validity period.
+     *
+     * Default: 10 days
+     *
+     * 10 days =
+     * 10 × 24 × 60 × 60 × 1000 milliseconds
+     */
+    @Value("${jwt.expiration-ms:864000000}")
+    private long expirationMs;
+
     private Key getSignKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(
+                secret.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     public String generateToken(String email) {
@@ -26,12 +39,22 @@ public class JwtService {
     }
 
     public String generateToken(String email, String role) {
+
+        Date issuedAt = new Date();
+
+        Date expiration = new Date(
+                issuedAt.getTime() + expirationMs
+        );
+
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 3))
-                .signWith(getSignKey(), SignatureAlgorithm.HS256)
+                .setIssuedAt(issuedAt)
+                .setExpiration(expiration)
+                .signWith(
+                        getSignKey(),
+                        SignatureAlgorithm.HS256
+                )
                 .compact();
     }
 
@@ -41,6 +64,7 @@ public class JwtService {
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+
         return claims.getSubject();
     }
 
@@ -50,6 +74,8 @@ public class JwtService {
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+
         return claims.get("role", String.class);
     }
 }
+
