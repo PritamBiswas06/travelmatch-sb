@@ -3,7 +3,6 @@ package com.pvp.travelmatch.controller;
 import com.pvp.travelmatch.entity.User;
 import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,71 +17,31 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OnboardingController {
 
+    public static final String CURRENT_TERMS_VERSION = "1.0";
+
     private final UserRepository userRepository;
-
-    @Value("${travelmatch.terms.version:1.0}")
-    private String termsVersion;
-
-    @GetMapping("/status")
-    public Map<String, Object> status() {
-        User user = currentUser();
-        return Map.of(
-                "requiresOnboarding", Boolean.TRUE.equals(user.getOnboardingRequired()),
-                "termsAccepted", Boolean.TRUE.equals(user.getTermsAccepted()),
-                "termsVersion", termsVersion
-        );
-    }
 
     @PostMapping("/accept-terms")
     public Map<String, Object> acceptTerms() {
-        User user = currentUser();
-
-        if (!Boolean.TRUE.equals(user.getOnboardingRequired())) {
-            return Map.of("message", "Onboarding already completed", "termsAccepted", Boolean.TRUE.equals(user.getTermsAccepted()));
-        }
-
-        user.setTermsAccepted(true);
-        user.setTermsAcceptedAt(LocalDateTime.now());
-        user.setTermsVersion(termsVersion);
-        userRepository.save(user);
-
-        return Map.of(
-                "message", "Terms and Conditions accepted",
-                "termsAccepted", true,
-                "termsVersion", termsVersion
-        );
-    }
-
-    @PostMapping("/complete")
-    public Map<String, String> complete() {
-        User user = currentUser();
-
-        if (!Boolean.TRUE.equals(user.getOnboardingRequired())) {
-            return Map.of("message", "Onboarding already completed");
-        }
-
-        if (!Boolean.TRUE.equals(user.getTermsAccepted())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "You must accept the Terms and Conditions before completing onboarding"
-            );
-        }
-
-        user.setOnboardingRequired(false);
-        userRepository.save(user);
-
-        return Map.of("message", "Onboarding completed");
-    }
-
-    private User currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated()
-                || authentication.getName() == null || authentication.getName().isBlank()) {
+                || authentication.getName() == null
+                || "anonymousUser".equals(authentication.getName())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
 
-        return userRepository.findByEmail(authentication.getName())
+        User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        user.setTermsAccepted(true);
+        user.setTermsAcceptedAt(LocalDateTime.now());
+        user.setTermsVersion(CURRENT_TERMS_VERSION);
+        userRepository.save(user);
+
+        return Map.of(
+                "termsAccepted", true,
+                "termsVersion", CURRENT_TERMS_VERSION
+        );
     }
 }
