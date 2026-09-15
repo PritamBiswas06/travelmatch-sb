@@ -33,6 +33,37 @@ public class User {
 
     private LocalDateTime createdAt;
 
+    // ==================== FIRST-LOGIN ONBOARDING ====================
+
+    /*
+     * True only for accounts that still need to complete the first-login
+     * onboarding flow. Existing accounts default to false when Hibernate
+     * adds this column; newly registered accounts are explicitly marked true
+     * by AuthController.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean onboardingRequired = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean termsAccepted = false;
+
+    private LocalDateTime termsAcceptedAt;
+
+    @Column(length = 30)
+    private String termsVersion;
+
+    // ==================== FIRST-LOGIN ONBOARDING ====================
+
+    /*
+     * True only for accounts that still need to complete the first-login
+     * onboarding flow. Existing accounts default to false when Hibernate
+     * adds this column; newly registered accounts are explicitly marked true
+     * by AuthController.
+     */
+
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonIgnore
     private List<TravelPlan> travelPlans;

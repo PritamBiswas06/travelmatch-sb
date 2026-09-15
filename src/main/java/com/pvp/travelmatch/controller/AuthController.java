@@ -65,6 +65,10 @@ public class AuthController {
              * generate a new OTP.
              */
             dbUser.setVerificationCode(generateOTP());
+            dbUser.setOnboardingRequired(true);
+            dbUser.setTermsAccepted(false);
+            dbUser.setTermsAcceptedAt(null);
+            dbUser.setTermsVersion(null);
             dbUser.setCodeExpiry(
                     LocalDateTime.now().plusMinutes(10)
             );
@@ -100,6 +104,12 @@ public class AuthController {
          */
         user.setRole(Role.USER);
         user.setAccountStatus(AccountStatus.ACTIVE);
+
+        // New accounts must complete onboarding after their first login.
+        user.setOnboardingRequired(true);
+        user.setTermsAccepted(false);
+        user.setTermsAcceptedAt(null);
+        user.setTermsVersion(null);
 
 
         // =====================================================
@@ -504,7 +514,9 @@ public class AuthController {
                 token,
                 user.getId(),
                 user.getName(),
-                role.name()
+                role.name(),
+                Boolean.TRUE.equals(user.getOnboardingRequired()),
+                Boolean.TRUE.equals(user.getTermsAccepted())
         );
     }
 
