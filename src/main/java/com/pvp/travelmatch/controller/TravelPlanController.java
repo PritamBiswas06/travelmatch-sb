@@ -25,6 +25,13 @@ public class TravelPlanController {
         return travelPlanService.createPlan(request);
     }
 
+    @PutMapping("/{planId}")
+    public TravelPlan updatePlan(
+            @PathVariable Long planId,
+            @RequestBody TravelPlanRequest request) {
+        return travelPlanService.updatePlan(planId, request);
+    }
+
     @GetMapping("/{planId}/matches")
     public List<MatchResponse> getMatches(@PathVariable Long planId) {
         return travelPlanService.findMatches(planId);

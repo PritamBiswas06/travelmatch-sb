@@ -12,6 +12,7 @@ import com.pvp.travelmatch.repository.SavedTravelPlanRepository;
 import com.pvp.travelmatch.repository.TravelCommentRepository;
 import com.pvp.travelmatch.repository.TravelMemoryRepository;
 import com.pvp.travelmatch.repository.TravelPlanRepository;
+import com.pvp.travelmatch.repository.TravelPartnerRepository;
 import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +37,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TravelPlanRepository travelPlanRepository;
+    private final TravelPartnerRepository travelPartnerRepository;
     private final MatchRequestRepository matchRequestRepository;
     private final NotificationService notificationService;
     private final TravelerReviewService travelerReviewService;
@@ -96,10 +98,34 @@ public class UserService {
                         .map(com.pvp.travelmatch.dto.TravelMemoryResponse::fromEntity)
                         .toList();
 
-        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips, posts, travelMemories);
+        List<com.pvp.travelmatch.dto.FriendResponse> friends =
+                travelPartnerRepository.findByUserOneOrUserTwo(targetUser, targetUser).stream()
+                        .map(partner -> {
+                            User friend = partner.getUserOne().getId().equals(targetUser.getId())
+                                    ? partner.getUserTwo()
+                                    : partner.getUserOne();
+                            return com.pvp.travelmatch.dto.FriendResponse.builder()
+                                    .userId(friend.getId())
+                                    .name(friend.getName())
+                                    .username(friend.getUsername())
+                                    .city(friend.getCity())
+                                    .country(friend.getCountry())
+                                    .gender(friend.getGender())
+                                    .profilePhotoUrl(toPhotoDataUri(friend))
+                                    .build();
+                        })
+                        .collect(java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.toMap(
+                                        com.pvp.travelmatch.dto.FriendResponse::getUserId,
+                                        f -> f,
+                                        (first, second) -> first,
+                                        java.util.LinkedHashMap::new),
+                                map -> new java.util.ArrayList<>(map.values())));
+
+        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips, posts, travelMemories, friends);
     }
 
-    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips, List<ProfileTripResponse> posts, List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories) {
+    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips, List<ProfileTripResponse> posts, List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories, List<com.pvp.travelmatch.dto.FriendResponse> friends) {
         return UserProfileResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
@@ -143,16 +169,23 @@ public class UserService {
                                 user.getId()
                         )
                 )
+                .friends(friends)
+                .friendCount(friends.size())
                 .build();
     }
 
     private ProfileTripResponse toProfileTripResponse(TravelPlan plan, User currentUser, boolean isOwnProfile) {
 
-        String matchRequestStatus = isOwnProfile
-                ? null
-                : matchRequestRepository.findBySenderIdAndTravelPlanId(currentUser.getId(), plan.getId())
-                .map(MatchRequest::getStatus)
-                .orElse("NONE");
+        String matchRequestStatus;
+        if (isOwnProfile) {
+            matchRequestStatus = null;
+        } else if (travelPartnerRepository.arePartners(currentUser, plan.getUser())) {
+            matchRequestStatus = "FRIENDS";
+        } else {
+            matchRequestStatus = matchRequestRepository.findBySenderIdAndTravelPlanId(currentUser.getId(), plan.getId())
+                    .map(MatchRequest::getStatus)
+                    .orElse("NONE");
+        }
 
         String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
                 .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)

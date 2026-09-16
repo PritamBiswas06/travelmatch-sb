@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import jakarta.transaction.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -257,10 +258,25 @@ Adventure starts with one decision 🌍
     }
 
     // Accept / Reject
+    @Transactional
     public MatchRequest updateStatus(Long requestId, String status) {
+
+        User currentUser = getCurrentUser();
 
         MatchRequest request = matchRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if (!request.getReceiver().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only manage requests sent to you");
+        }
+
+        if (!"ACCEPTED".equals(status) && !"REJECTED".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported request status");
+        }
+
+        if ("ACCEPTED".equals(status) && travelPartnerRepository.arePartners(request.getSender(), request.getReceiver())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You are already friends with this traveler");
+        }
 
         request.setStatus(status);
 
@@ -404,6 +420,13 @@ Adventure starts with one decision 🌍
         }
 
         return updated;
+    }
+
+    private User getCurrentUser() {
+        String email = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
     }
 
     // View Incoming Requests

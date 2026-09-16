@@ -6,21 +6,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(indexes = {
-        @Index(
-                name = "idx_partner_user_one_created",
-                columnList = "user_one_id,created_at"
-        ),
-        @Index(
-                name = "idx_partner_user_two_created",
-                columnList = "user_two_id,created_at"
-        )
-})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(indexes = {
+        @Index(name = "idx_partner_user_one", columnList = "user_one_id"),
+        @Index(name = "idx_partner_user_two", columnList = "user_two_id"),
+        @Index(name = "idx_partner_created_at", columnList = "created_at")
+})
 public class TravelPartner {
 
     @Id

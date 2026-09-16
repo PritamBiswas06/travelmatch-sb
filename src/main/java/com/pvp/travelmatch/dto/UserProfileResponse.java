@@ -55,4 +55,7 @@ public class UserProfileResponse {
     private long reviewCount;
 
     private List<TravelerReviewResponse> reviews;
+
+    private List<FriendResponse> friends;
+    private long friendCount;
 }
