@@ -7,6 +7,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(indexes = {
+        @Index(
+                name = "idx_travel_plan_user_created",
+                columnList = "user_id,created_at"
+        ),
+        @Index(
+                name = "idx_travel_plan_user_destination",
+                columnList = "user_id,destination"
+        )
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,26 +29,25 @@ public class TravelPlan {
     private Long id;
 
     private String fromLocation;
+
     private String destination;
 
     private LocalDate startDate;
+
     private LocalDate endDate;
 
     private Double budget;
 
-    private String travelType; // Adventure / Religious / Leisure
+    private String travelType;
 
     private LocalDateTime createdAt;
 
-    // ACTIVE / COMPLETED / CANCELLED - defaults to ACTIVE at creation
     @Builder.Default
     private String status = "ACTIVE";
 
-    // Raw counter, incremented via /share endpoint
     @Builder.Default
     private Integer shareCount = 0;
 
-    // Link with User
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;

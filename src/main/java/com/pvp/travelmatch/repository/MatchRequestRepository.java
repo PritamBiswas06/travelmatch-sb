@@ -7,19 +7,35 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
+public interface MatchRequestRepository
+        extends JpaRepository<MatchRequest, Long> {
 
     List<MatchRequest> findByReceiver(User receiver);
+
     List<MatchRequest> findBySender(User sender);
 
-    Optional<MatchRequest> findBySenderIdAndTravelPlanId(Long senderId, Long travelPlanId);
+    Optional<MatchRequest>
+    findBySenderIdAndTravelPlanId(
+            Long senderId,
+            Long travelPlanId
+    );
 
     void deleteByTravelPlan(TravelPlan travelPlan);
 
-    Page<MatchRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Page<MatchRequest> findAllByOrderByCreatedAtDesc(
+            Pageable pageable
+    );
+
     long countByStatus(String status);
-    long countBySenderIdAndCreatedAtAfter(Long senderId, java.time.LocalDateTime after);
+
+    long countByReceiverId(Long receiverId);
+
+    long countBySenderIdAndCreatedAtAfter(
+            Long senderId,
+            LocalDateTime after
+    );
 }

@@ -11,9 +11,32 @@ import org.springframework.data.jpa.repository.Query;
 import java.time.LocalDate;
 import java.util.List;
 
-public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long>, JpaSpecificationExecutor<TravelPlan> {
+public interface TravelPlanRepository
+        extends JpaRepository<TravelPlan, Long>,
+        JpaSpecificationExecutor<TravelPlan> {
 
     List<TravelPlan> findByUser(User user);
+
+    Page<TravelPlan> findByUserIdOrderByCreatedAtDesc(
+            Long userId,
+            Pageable pageable
+    );
+
+    long countByUserId(Long userId);
+
+    @Query("""
+        SELECT t.destination, COUNT(t)
+        FROM TravelPlan t
+        WHERE t.user.id = :userId
+          AND t.destination IS NOT NULL
+          AND TRIM(t.destination) <> ''
+        GROUP BY t.destination
+        ORDER BY COUNT(t) DESC
+    """)
+    List<Object[]> findDestinationCountsByUserId(
+            Long userId,
+            Pageable pageable
+    );
 
     @Query("""
         SELECT t FROM TravelPlan t
@@ -38,10 +61,17 @@ public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long>, J
         AND t.endDate >= :today
         ORDER BY t.createdAt DESC
     """)
-    List<TravelPlan> findFeedPlans(Long userId, LocalDate today);
+    List<TravelPlan> findFeedPlans(
+            Long userId,
+            LocalDate today
+    );
 
-    Page<TravelPlan> findByDestinationContainingIgnoreCaseOrFromLocationContainingIgnoreCase(
-            String destination, String fromLocation, Pageable pageable);
+    Page<TravelPlan>
+    findByDestinationContainingIgnoreCaseOrFromLocationContainingIgnoreCase(
+            String destination,
+            String fromLocation,
+            Pageable pageable
+    );
 
     long countByStatus(String status);
 }
