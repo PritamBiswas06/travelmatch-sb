@@ -77,6 +77,28 @@ public interface TravelPlanRepository
 
     List<TravelPlan> findByUserIdNot(Long userId);
 
+
+    @Query("""
+        SELECT t
+        FROM TravelPlan t
+        JOIN FETCH t.user u
+        WHERE u.id <> :userId
+          AND t.status = 'ACTIVE'
+          AND t.endDate >= :today
+          AND NOT EXISTS (
+              SELECT 1
+              FROM BlockedUser b
+              WHERE b.blocker.id = :userId
+                AND b.blockedUser.id = u.id
+          )
+        ORDER BY t.createdAt DESC
+    """)
+    List<TravelPlan> findFastLatestFeed(
+            Long userId,
+            LocalDate today,
+            Pageable pageable
+    );
+
     @Query("""
         SELECT t FROM TravelPlan t
         WHERE t.user.id <> :userId

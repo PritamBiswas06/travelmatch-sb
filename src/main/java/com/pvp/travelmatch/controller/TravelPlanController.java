@@ -3,7 +3,6 @@ package com.pvp.travelmatch.controller;
 import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
 import com.pvp.travelmatch.dto.FeedPageResponse;
-import org.springframework.data.domain.Page;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
 import com.pvp.travelmatch.entity.TravelPlan;

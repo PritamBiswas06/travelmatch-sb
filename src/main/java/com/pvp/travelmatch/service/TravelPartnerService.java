@@ -1,8 +1,7 @@
 package com.pvp.travelmatch.service;
 
-import com.pvp.travelmatch.entity.TravelPartner;
-import com.pvp.travelmatch.entity.User;
 import com.pvp.travelmatch.dto.TravelPartnerResponse;
+import com.pvp.travelmatch.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import com.pvp.travelmatch.repository.TravelPartnerRepository;
@@ -10,8 +9,6 @@ import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor

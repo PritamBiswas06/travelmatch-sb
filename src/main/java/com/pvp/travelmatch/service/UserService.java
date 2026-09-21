@@ -8,21 +8,14 @@ import com.pvp.travelmatch.entity.MatchRequest;
 import com.pvp.travelmatch.entity.PostReaction;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
-import com.pvp.travelmatch.repository.MatchRequestRepository;
-import com.pvp.travelmatch.repository.PostReactionRepository;
-import com.pvp.travelmatch.repository.SavedTravelPlanRepository;
-import com.pvp.travelmatch.repository.TravelCommentRepository;
-import com.pvp.travelmatch.repository.TravelMemoryRepository;
-import com.pvp.travelmatch.repository.TravelPlanRepository;
-import com.pvp.travelmatch.repository.TravelPartnerRepository;
-import com.pvp.travelmatch.repository.UserRepository;
+import com.pvp.travelmatch.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 
 import java.time.LocalDate;
 import java.util.*;
@@ -54,7 +47,6 @@ public class UserService {
         return getProfile(userId, 0, 10);
     }
 
-    @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId, int page, int size) {
 
         User currentUser = getCurrentUser();
@@ -139,7 +131,7 @@ public class UserService {
 
         var reviewsPage = travelerReviewService.getForUserPageResult(
                 targetUser.getId(), profilePage);
-        List<com.pvp.travelmatch.dto.TravelerReviewResponse> reviews =
+        List<TravelerReviewResponse> reviews =
                 reviewsPage.getContent();
 
         return buildProfileResponse(
@@ -212,7 +204,7 @@ public class UserService {
                         )
                 )
 
-                .reviews(reviews)
+.reviews(reviews)
                 .friends(friends)
                 .friendCount(friendCount)
                 .postsHasMore(postsHasMore)
@@ -272,7 +264,7 @@ public class UserService {
         boolean partners = !isOwnProfile
                 && plans.get(0).getUser() != null
                 && travelPartnerRepository.arePartners(
-                currentUser, plans.get(0).getUser());
+                        currentUser, plans.get(0).getUser());
 
         return plans.stream()
                 .map(plan -> ProfileTripResponse.builder()
@@ -294,9 +286,9 @@ public class UserService {
                                 isOwnProfile
                                         ? null
                                         : partners
-                                        ? "FRIENDS"
-                                        : requestStatuses.getOrDefault(
-                                        plan.getId(), "NONE"))
+                                            ? "FRIENDS"
+                                            : requestStatuses.getOrDefault(
+                                                plan.getId(), "NONE"))
                         .build())
                 .toList();
     }
@@ -315,7 +307,7 @@ public class UserService {
         }
 
         String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
-                .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)
+                .map(PostReaction::getReactionType)
                 .orElse(null);
 
         return ProfileTripResponse.builder()
@@ -481,13 +473,26 @@ public class UserService {
 
     // ==================== HELPERS ====================
 
+    public byte[] getProfilePhotoBytes(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getProfilePhoto)
+                .orElse(null);
+    }
+
+    public String getProfilePhotoContentType(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getProfilePhotoContentType)
+                .orElse(null);
+    }
+
     private String toPhotoDataUri(User user) {
-        if (user.getProfilePhoto() == null || user.getProfilePhoto().length == 0
-                || user.getProfilePhotoContentType() == null) {
+        if (user == null || user.getId() == null) {
             return null;
         }
-        String base64 = Base64.getEncoder().encodeToString(user.getProfilePhoto());
-        return "data:" + user.getProfilePhotoContentType() + ";base64," + base64;
+
+        // Do not access the LONGBLOB while building profile JSON.
+        // The browser fetches the image through the dedicated photo endpoint.
+        return "/api/users/" + user.getId() + "/photo";
     }
 
     private String validateAndNormalizeUsername(String rawUsername, Long currentUserId) {

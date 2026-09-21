@@ -256,14 +256,62 @@ Keep an eye on your inbox for match requests 👀
                 TravelPlanSpecifications.feedFilters(
                         currentUser.getId(), LocalDate.now(), filter);
 
-        Page<TravelPlan> feedPage = travelPlanRepository.findAll(
-                spec,
-                PageRequest.of(
-                        safePage,
-                        safeSize,
-                        Sort.by(Sort.Direction.DESC, "createdAt")
-                )
-        );
+        /*
+         * The normal Spring Data Page query performs an additional COUNT(*)
+         * query. For the default Latest feed that count is unnecessary and
+         * can be expensive on a large table. Fetch size + 1 rows instead and
+         * use the extra row to determine hasMore.
+         */
+        boolean simpleLatestFeed =
+                "latest".equalsIgnoreCase(sortBy)
+                        && (filter == null
+                            || (filter.getDestination() == null
+                                && filter.getFromLocation() == null
+                                && filter.getMinBudget() == null
+                                && filter.getMaxBudget() == null
+                                && filter.getStartDate() == null
+                                && filter.getEndDate() == null
+                                && filter.getTravelType() == null
+                                && filter.getMinMatchScore() == null
+                                && filter.getMinAge() == null
+                                && filter.getMaxAge() == null
+                                && filter.getTravelStyle() == null
+                                && filter.getTravelInterest() == null
+                                && filter.getLanguage() == null
+                                && filter.getCountry() == null
+                                && filter.getCity() == null));
+
+        boolean hasMore;
+        List<TravelPlan> feedPlans;
+
+        if (simpleLatestFeed) {
+            List<TravelPlan> rows = travelPlanRepository.findFastLatestFeed(
+                    currentUser.getId(),
+                    LocalDate.now(),
+                    PageRequest.of(
+                            safePage,
+                            safeSize + 1,
+                            Sort.by(Sort.Direction.DESC, "createdAt")
+                    )
+            );
+
+            hasMore = rows.size() > safeSize;
+            feedPlans = hasMore
+                    ? rows.subList(0, safeSize)
+                    : rows;
+        } else {
+            Page<TravelPlan> feedPage = travelPlanRepository.findAll(
+                    spec,
+                    PageRequest.of(
+                            safePage,
+                            safeSize,
+                            Sort.by(Sort.Direction.DESC, "createdAt")
+                    )
+            );
+
+            hasMore = feedPage.hasNext();
+            feedPlans = feedPage.getContent();
+        }
 
         TravelPlan myLatestPlan = travelPlanRepository
                 .findTopByUserIdOrderByCreatedAtDesc(currentUser.getId())
@@ -271,7 +319,7 @@ Keep an eye on your inbox for match requests 👀
 
         List<FeedPostResponse> posts =
                 toFeedPostResponses(
-                        feedPage.getContent(),
+                        feedPlans,
                         currentUser,
                         myLatestPlan
                 );
@@ -294,11 +342,11 @@ Keep an eye on your inbox for match requests 👀
         } else if ("match".equalsIgnoreCase(sortBy)) {
             posts = posts.stream()
                     .sorted(Comparator.comparing(
-                                    (FeedPostResponse p) ->
-                                            p.getMatchScore() == null ? -1 : p.getMatchScore()
-                            ).reversed()
-                            .thenComparing(FeedPostResponse::getCreatedAt,
-                                    Comparator.reverseOrder()))
+                            (FeedPostResponse p) ->
+                                    p.getMatchScore() == null ? -1 : p.getMatchScore()
+                    ).reversed()
+                    .thenComparing(FeedPostResponse::getCreatedAt,
+                            Comparator.reverseOrder()))
                     .toList();
         }
 
@@ -306,7 +354,7 @@ Keep an eye on your inbox for match requests 👀
                 posts,
                 safePage,
                 safeSize,
-                feedPage.hasNext()
+                hasMore
         );
     }
 
@@ -438,7 +486,7 @@ Keep an eye on your inbox for match requests 👀
                                     partnerOwnerIds.contains(owner.getId())
                                             ? "FRIENDS"
                                             : requestStatuses.getOrDefault(
-                                            plan.getId(), "NONE"))
+                                                    plan.getId(), "NONE"))
                             .premiumUser(premiumUserIds.contains(owner.getId()))
                             .boosted(boost != null)
                             .boostMultiplier(
@@ -472,25 +520,15 @@ Keep an eye on your inbox for match requests 👀
     }
 
     private String toPhotoDataUri(User user) {
-
-        if (user == null ||
-                user.getProfilePhoto() == null ||
-                user.getProfilePhoto().length == 0 ||
-                user.getProfilePhotoContentType() == null) {
-
+        if (user == null || user.getId() == null) {
             return null;
         }
 
-        String base64 =
-                java.util.Base64
-                        .getEncoder()
-                        .encodeToString(user.getProfilePhoto());
-
-        return "data:" +
-                user.getProfilePhotoContentType() +
-                ";base64," +
-                base64;
+        // Do not touch the LONGBLOB here. The browser fetches the image
+        // separately and can cache it. This keeps feed/profile JSON small.
+        return "/api/users/" + user.getId() + "/photo";
     }
+
     private FeedPostResponse toFeedPostResponse(
             TravelPlan plan,
             User currentUser,

@@ -114,6 +114,7 @@ public class User {
     // storage mechanism to reuse, and this avoids relying on ephemeral local
     // disk storage on the deployment platform).
     @Lob
+    @Basic(fetch = FetchType.LAZY)
     @Column(columnDefinition = "LONGBLOB")
     private byte[] profilePhoto;
 
