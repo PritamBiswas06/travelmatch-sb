@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -53,6 +54,7 @@ public class UserService {
         return getProfile(userId, 0, 10);
     }
 
+    @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId, int page, int size) {
 
         User currentUser = getCurrentUser();
@@ -137,7 +139,7 @@ public class UserService {
 
         var reviewsPage = travelerReviewService.getForUserPageResult(
                 targetUser.getId(), profilePage);
-        List<TravelerReviewResponse> reviews =
+        List<com.pvp.travelmatch.dto.TravelerReviewResponse> reviews =
                 reviewsPage.getContent();
 
         return buildProfileResponse(
@@ -210,7 +212,7 @@ public class UserService {
                         )
                 )
 
-.reviews(reviews)
+                .reviews(reviews)
                 .friends(friends)
                 .friendCount(friendCount)
                 .postsHasMore(postsHasMore)
@@ -270,7 +272,7 @@ public class UserService {
         boolean partners = !isOwnProfile
                 && plans.get(0).getUser() != null
                 && travelPartnerRepository.arePartners(
-                        currentUser, plans.get(0).getUser());
+                currentUser, plans.get(0).getUser());
 
         return plans.stream()
                 .map(plan -> ProfileTripResponse.builder()
@@ -292,9 +294,9 @@ public class UserService {
                                 isOwnProfile
                                         ? null
                                         : partners
-                                            ? "FRIENDS"
-                                            : requestStatuses.getOrDefault(
-                                                plan.getId(), "NONE"))
+                                        ? "FRIENDS"
+                                        : requestStatuses.getOrDefault(
+                                        plan.getId(), "NONE"))
                         .build())
                 .toList();
     }
@@ -313,7 +315,7 @@ public class UserService {
         }
 
         String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
-                .map(PostReaction::getReactionType)
+                .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)
                 .orElse(null);
 
         return ProfileTripResponse.builder()
