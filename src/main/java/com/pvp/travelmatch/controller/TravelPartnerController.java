@@ -1,6 +1,9 @@
 package com.pvp.travelmatch.controller;
 
 import com.pvp.travelmatch.entity.TravelPartner;
+import com.pvp.travelmatch.dto.TravelPartnerResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.pvp.travelmatch.service.TravelPartnerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +21,9 @@ public class TravelPartnerController {
     private final TravelPartnerService travelPartnerService;
 
     @GetMapping("/my")
-    public List<TravelPartner> myPartners() {
-        return travelPartnerService.getMyPartners();
+    public Page<TravelPartnerResponse> myPartners(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return travelPartnerService.getMyPartners(page, size);
     }
 }

@@ -18,8 +18,11 @@ public class UserController {
     // Public (authenticated) profile view — used by Feed "View Profile" and
     // by the sidebar's "Profile" link for the logged-in user's own profile.
     @GetMapping("/{userId}/profile")
-    public UserProfileResponse getProfile(@PathVariable Long userId) {
-        return userService.getProfile(userId);
+    public UserProfileResponse getProfile(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return userService.getProfile(userId, page, size);
     }
 
     // Edit own profile only — the authenticated user is resolved from the

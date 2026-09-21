@@ -10,6 +10,9 @@ import com.pvp.travelmatch.repository.TravelPlanRepository;
 import com.pvp.travelmatch.repository.TravelerReviewRepository;
 import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -287,4 +290,19 @@ public class TravelerReviewService {
         return reviewRepository
                 .countByReviewedUserId(userId);
     }
-}
+public Page<TravelerReviewResponse> getForUserPageResult(Long userId, Pageable pageable) {
+        return reviewRepository
+                .findByReviewedUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(TravelerReviewResponse::fromEntity);
+    }
+
+    public List<TravelerReviewResponse> getForUserPage(Long userId, Pageable pageable) {
+        return reviewRepository
+                .findByReviewedUserIdOrderByCreatedAtDesc(userId, pageable)
+                .getContent()
+                .stream()
+                .map(TravelerReviewResponse::fromEntity)
+                .toList();
+    }
+
+    }

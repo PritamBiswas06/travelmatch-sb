@@ -1,6 +1,9 @@
 package com.pvp.travelmatch.service;
 
 import com.pvp.travelmatch.entity.*;
+import com.pvp.travelmatch.dto.MatchRequestResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import com.pvp.travelmatch.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -430,14 +433,38 @@ Adventure starts with one decision 🌍
     }
 
     // View Incoming Requests
-    public List<MatchRequest> getMyRequests() {
+    public Page<MatchRequestResponse> getMyRequests(int page, int size) {
 
-        String email = (String) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal();
+        User user = getCurrentUser();
+        int safeSize = Math.min(Math.max(size, 1), 20);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return matchRequestRepository.findByReceiver(user);
+        return matchRequestRepository
+                .findByReceiverIdOrderByCreatedAtDesc(
+                        user.getId(),
+                        PageRequest.of(Math.max(page, 0), safeSize)
+                )
+                .map(request -> new MatchRequestResponse(
+                        request.getId(),
+                        request.getStatus(),
+                        request.getCreatedAt(),
+                        new MatchRequestResponse.UserSummary(
+                                request.getSender().getId(),
+                                request.getSender().getName(),
+                                request.getSender().getCity(),
+                                request.getSender().getCountry()
+                        ),
+                        new MatchRequestResponse.UserSummary(
+                                request.getReceiver().getId(),
+                                request.getReceiver().getName(),
+                                request.getReceiver().getCity(),
+                                request.getReceiver().getCountry()
+                        ),
+                        new MatchRequestResponse.TravelPlanSummary(
+                                request.getTravelPlan().getId(),
+                                request.getTravelPlan().getDestination(),
+                                request.getTravelPlan().getStartDate(),
+                                request.getTravelPlan().getEndDate()
+                        )
+                ));
     }
 }

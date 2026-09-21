@@ -14,6 +14,7 @@ public interface TravelerReviewRepository extends JpaRepository<TravelerReview, 
             Long reviewerId, Long reviewedUserId, Long travelPlanId);
 
     List<TravelerReview> findByReviewedUserIdOrderByCreatedAtDesc(Long reviewedUserId);
+    Page<TravelerReview> findByReviewedUserIdOrderByCreatedAtDesc(Long reviewedUserId, Pageable pageable);
     long countByReviewedUserId(Long reviewedUserId);
 
     @Query("""

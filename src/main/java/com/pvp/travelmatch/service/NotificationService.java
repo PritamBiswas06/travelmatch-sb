@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -209,7 +210,11 @@ public class NotificationService {
         User currentUser = getCurrentUser();
 
         return notificationRepository
-                .findByReceiverIdOrderByCreatedAtDesc(currentUser.getId())
+                .findByReceiverIdOrderByCreatedAtDesc(
+                        currentUser.getId(),
+                        PageRequest.of(0, 30)
+                )
+                .getContent()
                 .stream()
                 .map(NotificationResponse::fromEntity)
                 .toList();

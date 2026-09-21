@@ -6,6 +6,7 @@ import com.pvp.travelmatch.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public interface TravelPartnerRepository extends JpaRepository<TravelPartner, Lo
             Long userTwoId
     );
 
+    @EntityGraph(attributePaths = {"userOne", "userTwo", "travelPlan"})
     Page<TravelPartner> findByUserOneIdOrUserTwoIdOrderByCreatedAtDesc(
             Long userOneId,
             Long userTwoId,

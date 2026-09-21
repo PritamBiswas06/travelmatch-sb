@@ -1,9 +1,11 @@
 package com.pvp.travelmatch.service;
 
 import com.pvp.travelmatch.dto.ProfileTripResponse;
+import com.pvp.travelmatch.dto.TravelerReviewResponse;
 import com.pvp.travelmatch.dto.UpdateProfileRequest;
 import com.pvp.travelmatch.dto.UserProfileResponse;
 import com.pvp.travelmatch.entity.MatchRequest;
+import com.pvp.travelmatch.entity.PostReaction;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
 import com.pvp.travelmatch.repository.MatchRequestRepository;
@@ -15,16 +17,14 @@ import com.pvp.travelmatch.repository.TravelPlanRepository;
 import com.pvp.travelmatch.repository.TravelPartnerRepository;
 import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +50,10 @@ public class UserService {
     // ==================== VIEW PROFILE ====================
 
     public UserProfileResponse getProfile(Long userId) {
+        return getProfile(userId, 0, 10);
+    }
+
+    public UserProfileResponse getProfile(Long userId, int page, int size) {
 
         User currentUser = getCurrentUser();
 
@@ -58,48 +62,57 @@ public class UserService {
 
         boolean isOwnProfile = currentUser.getId().equals(targetUser.getId());
 
-        // 🔔 Notify the profile owner that someone viewed their profile.
-        // - Only when it's NOT the owner's own profile.
-        // - Viewer/owner are both resolved server-side above (JWT + path id
-        //   lookup), never trusted from any request body/query param.
-        // - Deduplicated inside NotificationService (max 1 per viewer/owner
-        //   pair per 24h), so refreshing the page repeatedly won't spam.
-        // - Wrapped so a notification failure can never break profile viewing.
         if (!isOwnProfile) {
             try {
                 monetizationService.recordProfileView(targetUser.getId());
                 notificationService.createProfileViewNotification(targetUser, currentUser);
             } catch (Exception e) {
-                // Deliberately swallow: viewing a profile must always succeed
-                // even if the notification side-effect fails.
+                // Profile reads must not fail because of notification side effects.
             }
         }
 
-        List<TravelPlan> userPlans = travelPlanRepository.findByUser(targetUser).stream()
-                .sorted(Comparator.comparing(TravelPlan::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
+        final int safePage = Math.max(page, 0);
+        final int pageSize = Math.min(Math.max(size, 1), 20);
+        PageRequest profilePage = PageRequest.of(
+                safePage, pageSize,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
 
-        // All public travel plans are shown on the profile, including completed
-        // trips, so a profile behaves like a social travel timeline.
-        List<ProfileTripResponse> posts = userPlans.stream()
-                .map(plan -> toProfileTripResponse(plan, currentUser, isOwnProfile))
-                .toList();
+        var postsPage = travelPlanRepository
+                .findByUserIdOrderByCreatedAtDesc(targetUser.getId(), profilePage);
+        List<TravelPlan> userPlans = postsPage.getContent();
 
-        List<ProfileTripResponse> upcomingTrips = userPlans.stream()
-                .filter(plan -> "ACTIVE".equalsIgnoreCase(plan.getStatus())
-                        && plan.getEndDate() != null
-                        && !plan.getEndDate().isBefore(LocalDate.now()))
-                .sorted(Comparator.comparing(TravelPlan::getStartDate, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(plan -> toProfileTripResponse(plan, currentUser, isOwnProfile))
-                .toList();
+        List<ProfileTripResponse> posts =
+                toProfileTripResponses(userPlans, currentUser, isOwnProfile);
 
+        List<TravelPlan> upcomingPlanList = travelPlanRepository
+                .findUpcomingByUserId(
+                        targetUser.getId(),
+                        LocalDate.now(),
+                        PageRequest.of(safePage, pageSize)
+                )
+                .getContent();
+
+        List<ProfileTripResponse> upcomingTrips =
+                toProfileTripResponses(
+                        upcomingPlanList, currentUser, isOwnProfile);
+
+        var memoriesPage = travelMemoryRepository
+                .findByUserIdOrderByCreatedAtDesc(
+                        targetUser.getId(), profilePage);
         List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories =
-                travelMemoryRepository.findByUserIdOrderByCreatedAtDesc(targetUser.getId()).stream()
+                memoriesPage.getContent()
+                        .stream()
                         .map(com.pvp.travelmatch.dto.TravelMemoryResponse::fromEntity)
                         .toList();
 
+        var friendsPage = travelPartnerRepository
+                .findByUserOneIdOrUserTwoIdOrderByCreatedAtDesc(
+                        targetUser.getId(),
+                        targetUser.getId(),
+                        profilePage);
         List<com.pvp.travelmatch.dto.FriendResponse> friends =
-                travelPartnerRepository.findByUserOneOrUserTwo(targetUser, targetUser).stream()
+                friendsPage.getContent().stream()
                         .map(partner -> {
                             User friend = partner.getUserOne().getId().equals(targetUser.getId())
                                     ? partner.getUserTwo()
@@ -122,10 +135,43 @@ public class UserService {
                                         java.util.LinkedHashMap::new),
                                 map -> new java.util.ArrayList<>(map.values())));
 
-        return buildProfileResponse(targetUser, isOwnProfile, upcomingTrips, posts, travelMemories, friends);
+        var reviewsPage = travelerReviewService.getForUserPageResult(
+                targetUser.getId(), profilePage);
+        List<TravelerReviewResponse> reviews =
+                reviewsPage.getContent();
+
+        return buildProfileResponse(
+                targetUser,
+                isOwnProfile,
+                upcomingTrips,
+                posts,
+                travelMemories,
+                friends,
+                reviews,
+                travelPlanRepository.countByUserId(targetUser.getId()),
+                travelPartnerRepository.countByUserOneIdOrUserTwoId(targetUser.getId(), targetUser.getId()),
+                postsPage.hasNext(),
+                memoriesPage.hasNext(),
+                friendsPage.hasNext(),
+                reviewsPage.hasNext()
+        );
     }
 
-    private UserProfileResponse buildProfileResponse(User user, boolean isOwnProfile, List<ProfileTripResponse> upcomingTrips, List<ProfileTripResponse> posts, List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories, List<com.pvp.travelmatch.dto.FriendResponse> friends) {
+
+    private UserProfileResponse buildProfileResponse(
+            User user,
+            boolean isOwnProfile,
+            List<ProfileTripResponse> upcomingTrips,
+            List<ProfileTripResponse> posts,
+            List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories,
+            List<com.pvp.travelmatch.dto.FriendResponse> friends,
+            List<TravelerReviewResponse> reviews,
+            long tripCount,
+            long friendCount,
+            boolean postsHasMore,
+            boolean memoriesHasMore,
+            boolean friendsHasMore,
+            boolean reviewsHasMore) {
         return UserProfileResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
@@ -164,14 +210,93 @@ public class UserService {
                         )
                 )
 
-                .reviews(
-                        travelerReviewService.getForUser(
-                                user.getId()
-                        )
-                )
+.reviews(reviews)
                 .friends(friends)
-                .friendCount(friends.size())
+                .friendCount(friendCount)
+                .postsHasMore(postsHasMore)
+                .memoriesHasMore(memoriesHasMore)
+                .friendsHasMore(friendsHasMore)
+                .reviewsHasMore(reviewsHasMore)
                 .build();
+    }
+
+    private List<ProfileTripResponse> toProfileTripResponses(
+            List<TravelPlan> plans,
+            User currentUser,
+            boolean isOwnProfile) {
+
+        if (plans.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> planIds = plans.stream().map(TravelPlan::getId).toList();
+
+        Map<Long, Long> likes = new HashMap<>();
+        Map<Long, Long> comments = new HashMap<>();
+        for (Object[] row : postReactionRepository.countByPlanIdsGrouped(planIds)) {
+            if ("LIKE".equals(String.valueOf(row[1]))) {
+                likes.put(((Number) row[0]).longValue(),
+                        ((Number) row[2]).longValue());
+            }
+        }
+        for (Object[] row : travelCommentRepository.countByPlanIds(planIds)) {
+            comments.put(((Number) row[0]).longValue(),
+                    ((Number) row[1]).longValue());
+        }
+
+        Map<Long, String> reactions = new HashMap<>();
+        for (PostReaction reaction :
+                postReactionRepository.findByUserAndTravelPlanIn(
+                        currentUser, plans)) {
+            reactions.put(reaction.getTravelPlan().getId(),
+                    reaction.getReactionType());
+        }
+
+        Set<Long> savedIds = new HashSet<>(
+                savedTravelPlanRepository.findSavedPlanIds(
+                        currentUser.getId(), planIds));
+
+        Map<Long, String> requestStatuses = new HashMap<>();
+        if (!isOwnProfile) {
+            for (MatchRequest request :
+                    matchRequestRepository.findBySenderIdAndTravelPlanIds(
+                            currentUser.getId(), planIds)) {
+                requestStatuses.put(
+                        request.getTravelPlan().getId(),
+                        request.getStatus());
+            }
+        }
+
+        boolean partners = !isOwnProfile
+                && plans.get(0).getUser() != null
+                && travelPartnerRepository.arePartners(
+                        currentUser, plans.get(0).getUser());
+
+        return plans.stream()
+                .map(plan -> ProfileTripResponse.builder()
+                        .id(plan.getId())
+                        .fromLocation(plan.getFromLocation())
+                        .destination(plan.getDestination())
+                        .startDate(plan.getStartDate())
+                        .endDate(plan.getEndDate())
+                        .budget(plan.getBudget())
+                        .travelType(plan.getTravelType())
+                        .status(plan.getStatus())
+                        .createdAt(plan.getCreatedAt())
+                        .likeCount(likes.getOrDefault(plan.getId(), 0L))
+                        .shareCount(plan.getShareCount() == null ? 0 : plan.getShareCount())
+                        .commentCount(comments.getOrDefault(plan.getId(), 0L))
+                        .currentUserReaction(reactions.get(plan.getId()))
+                        .currentUserSaved(savedIds.contains(plan.getId()))
+                        .matchRequestStatus(
+                                isOwnProfile
+                                        ? null
+                                        : partners
+                                            ? "FRIENDS"
+                                            : requestStatuses.getOrDefault(
+                                                plan.getId(), "NONE"))
+                        .build())
+                .toList();
     }
 
     private ProfileTripResponse toProfileTripResponse(TravelPlan plan, User currentUser, boolean isOwnProfile) {
@@ -188,7 +313,7 @@ public class UserService {
         }
 
         String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
-                .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)
+                .map(PostReaction::getReactionType)
                 .orElse(null);
 
         return ProfileTripResponse.builder()

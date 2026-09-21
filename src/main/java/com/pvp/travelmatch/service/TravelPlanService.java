@@ -2,6 +2,7 @@ package com.pvp.travelmatch.service;
 
 import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
+import com.pvp.travelmatch.dto.FeedPageResponse;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
 import com.pvp.travelmatch.entity.*;
@@ -11,6 +12,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,9 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,7 @@ public class TravelPlanService {
     private final TravelMemoryRepository travelMemoryRepository;
     private final MonetizationService monetizationService;
     private final BoostedTravelPlanRepository boostedTravelPlanRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
     @Value("${app.frontend-url:https://tripmatch.fun}")
     private String frontendUrl;
@@ -150,9 +153,8 @@ Keep an eye on your inbox for match requests 👀
                         "Travel post not found"
                 ));
 
-        List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
-        TravelPlan myLatestPlan = myPlans.stream()
-                .max(Comparator.comparing(TravelPlan::getCreatedAt))
+        TravelPlan myLatestPlan = travelPlanRepository
+                .findTopByUserIdOrderByCreatedAtDesc(currentUser.getId())
                 .orElse(null);
 
         return toFeedPostResponse(plan, currentUser, myLatestPlan);
@@ -234,51 +236,227 @@ Keep an eye on your inbox for match requests 👀
 
     // ==================== FEED ====================
 
-    public List<FeedPostResponse> getFeed(String sortBy, FeedFilterRequest filter) {
+    public FeedPageResponse getFeed(String sortBy, FeedFilterRequest filter, int page, int size) {
 
         User currentUser = getCurrentUser();
         boolean premium = monetizationService.isPremium(currentUser);
-        if (filter != null && (filter.getMinAge()!=null || filter.getMaxAge()!=null || filter.getTravelStyle()!=null || filter.getTravelInterest()!=null || filter.getLanguage()!=null || filter.getCountry()!=null || filter.getCity()!=null) && !premium) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Premium subscription required for advanced filters");
 
-        // All destination/location/budget/date/travelType filters are applied
-        // at the database level via a Specification, so no unfiltered
-        // over-fetching happens regardless of how many filters are active.
+        if (filter != null && (filter.getMinAge()!=null || filter.getMaxAge()!=null
+                || filter.getTravelStyle()!=null || filter.getTravelInterest()!=null
+                || filter.getLanguage()!=null || filter.getCountry()!=null || filter.getCity()!=null)
+                && !premium) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Premium subscription required for advanced filters");
+        }
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 20);
+
         Specification<TravelPlan> spec =
-                TravelPlanSpecifications.feedFilters(currentUser.getId(), LocalDate.now(), filter);
+                TravelPlanSpecifications.feedFilters(
+                        currentUser.getId(), LocalDate.now(), filter);
 
-        List<TravelPlan> feedPlans =
-                travelPlanRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<TravelPlan> feedPage = travelPlanRepository.findAll(
+                spec,
+                PageRequest.of(
+                        safePage,
+                        safeSize,
+                        Sort.by(Sort.Direction.DESC, "createdAt")
+                )
+        );
 
-        // Used to compute an optional match score against the viewer's own trips
-        List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
-        TravelPlan myLatestPlan = myPlans.stream()
-                .max(Comparator.comparing(TravelPlan::getCreatedAt))
+        TravelPlan myLatestPlan = travelPlanRepository
+                .findTopByUserIdOrderByCreatedAtDesc(currentUser.getId())
                 .orElse(null);
 
-        List<FeedPostResponse> posts = feedPlans.stream()
-                .map(plan -> toFeedPostResponse(plan, currentUser, myLatestPlan))
-                .collect(java.util.stream.Collectors.toList());
+        List<FeedPostResponse> posts =
+                toFeedPostResponses(
+                        feedPage.getContent(),
+                        currentUser,
+                        myLatestPlan
+                );
 
-        // Match score isn't a DB column (it's computed per-viewer), so the
-        // "minimum match %" filter is applied here, after scoring.
         if (filter != null && filter.getMinMatchScore() != null) {
             int minScore = filter.getMinMatchScore();
             posts = posts.stream()
-                    .filter(p -> p.getMatchScore() != null && p.getMatchScore() >= minScore)
-                    .collect(java.util.stream.Collectors.toList());
+                    .filter(p -> p.getMatchScore() != null
+                            && p.getMatchScore() >= minScore)
+                    .toList();
         }
 
-        posts.sort(Comparator.comparingDouble((FeedPostResponse p)->(p.isBoosted()?1000.0*(p.getBoostMultiplier()==null?1.0:p.getBoostMultiplier()):0)+(p.isPremiumUser()?50:0)+p.getLikeCount()*0.1).reversed().thenComparing(FeedPostResponse::getCreatedAt,Comparator.reverseOrder()));
         if ("popular".equalsIgnoreCase(sortBy)) {
-            posts.sort(Comparator.comparingLong(FeedPostResponse::getLikeCount).reversed());
+            posts = posts.stream()
+                    .sorted(Comparator.comparingLong(FeedPostResponse::getLikeCount)
+                            .reversed()
+                            .thenComparing(FeedPostResponse::getCreatedAt,
+                                    Comparator.reverseOrder()))
+                    .toList();
         } else if ("match".equalsIgnoreCase(sortBy)) {
-            posts.sort(Comparator.comparing(
-                    (FeedPostResponse p) -> p.getMatchScore() == null ? -1 : p.getMatchScore()
-            ).reversed());
+            posts = posts.stream()
+                    .sorted(Comparator.comparing(
+                            (FeedPostResponse p) ->
+                                    p.getMatchScore() == null ? -1 : p.getMatchScore()
+                    ).reversed()
+                    .thenComparing(FeedPostResponse::getCreatedAt,
+                            Comparator.reverseOrder()))
+                    .toList();
         }
-        // "latest" (default) is already the natural order from the query (createdAt DESC)
 
-        return posts;
+        return new FeedPageResponse(
+                posts,
+                safePage,
+                safeSize,
+                feedPage.hasNext()
+        );
+    }
+
+    /**
+     * Builds a feed page without issuing per-post count/existence queries.
+     * All viewer-specific state for the page is fetched in batches.
+     */
+    private List<FeedPostResponse> toFeedPostResponses(
+            List<TravelPlan> plans,
+            User currentUser,
+            TravelPlan myLatestPlan) {
+
+        if (plans.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> planIds = plans.stream()
+                .map(TravelPlan::getId)
+                .toList();
+
+        Map<Long, Long> likes = new HashMap<>();
+        Map<Long, Long> dislikes = new HashMap<>();
+        for (Object[] row : postReactionRepository.countByPlanIdsGrouped(planIds)) {
+            Long planId = ((Number) row[0]).longValue();
+            String type = String.valueOf(row[1]);
+            long count = ((Number) row[2]).longValue();
+            if ("LIKE".equals(type)) {
+                likes.put(planId, count);
+            } else if ("DISLIKE".equals(type)) {
+                dislikes.put(planId, count);
+            }
+        }
+
+        Map<Long, String> reactions = new HashMap<>();
+        for (PostReaction reaction :
+                postReactionRepository.findByUserAndTravelPlanIn(
+                        currentUser, plans)) {
+            reactions.put(
+                    reaction.getTravelPlan().getId(),
+                    reaction.getReactionType()
+            );
+        }
+
+        Set<Long> savedIds = new HashSet<>(
+                savedTravelPlanRepository.findSavedPlanIds(
+                        currentUser.getId(), planIds));
+
+        Map<Long, Long> comments = new HashMap<>();
+        for (Object[] row : travelCommentRepository.countByPlanIds(planIds)) {
+            comments.put(
+                    ((Number) row[0]).longValue(),
+                    ((Number) row[1]).longValue()
+            );
+        }
+
+        Map<Long, String> requestStatuses = new HashMap<>();
+        for (MatchRequest request :
+                matchRequestRepository.findBySenderIdAndTravelPlanIds(
+                        currentUser.getId(), planIds)) {
+            requestStatuses.put(
+                    request.getTravelPlan().getId(),
+                    request.getStatus()
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, BoostedTravelPlan> boosts = boostedTravelPlanRepository
+                .findActiveForPlans(planIds, now)
+                .stream()
+                .collect(Collectors.toMap(
+                        b -> b.getTravelPlan().getId(),
+                        b -> b,
+                        (a, b) -> a
+                ));
+
+        Set<Long> premiumUserIds = new HashSet<>();
+        List<Long> ownerIds = plans.stream()
+                .map(plan -> plan.getUser().getId())
+                .distinct()
+                .toList();
+
+        // Subscription status is fetched once for the whole page instead of
+        // one database call per post owner.
+        subscriptionsForFeed(ownerIds).forEach(premiumUserIds::add);
+
+        return plans.stream()
+                .map(plan -> {
+                    User owner = plan.getUser();
+                    CompatibilityService.CompatibilityResult compatibility =
+                            compatibilityService.calculate(
+                                    currentUser, myLatestPlan, owner, plan);
+
+                    BoostedTravelPlan boost = boosts.get(plan.getId());
+
+                    return FeedPostResponse.builder()
+                            .id(plan.getId())
+                            .userId(owner.getId())
+                            .userName(owner.getName())
+                            .userCity(owner.getCity())
+                            .userGender(owner.getGender())
+                            .profilePhotoUrl(toPhotoDataUri(owner))
+                            .fromLocation(plan.getFromLocation())
+                            .destination(plan.getDestination())
+                            .startDate(plan.getStartDate())
+                            .endDate(plan.getEndDate())
+                            .budget(plan.getBudget())
+                            .travelType(plan.getTravelType())
+                            .status(plan.getStatus())
+                            .createdAt(plan.getCreatedAt())
+                            .matchScore(compatibility.score())
+                            .matchFactors(compatibility.factors())
+                            .likeCount(likes.getOrDefault(plan.getId(), 0L))
+                            .dislikeCount(dislikes.getOrDefault(plan.getId(), 0L))
+                            .shareCount(plan.getShareCount())
+                            .currentUserReaction(reactions.get(plan.getId()))
+                            .currentUserSaved(savedIds.contains(plan.getId()))
+                            .commentCount(comments.getOrDefault(plan.getId(), 0L))
+                            .matchRequestStatus(
+                                    requestStatuses.getOrDefault(
+                                            plan.getId(), "NONE"))
+                            .premiumUser(premiumUserIds.contains(owner.getId()))
+                            .boosted(boost != null)
+                            .boostMultiplier(
+                                    boost == null ? null : boost.getMultiplier())
+                            .build();
+                })
+                .toList();
+    }
+
+    private Set<Long> subscriptionsForFeed(List<Long> ownerIds) {
+        if (ownerIds.isEmpty()) {
+            return Set.of();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        return subscriptionsRepository()
+                .findByUserIdIn(ownerIds)
+                .stream()
+                .filter(subscription ->
+                        subscription.getPlan() == SubscriptionPlan.PREMIUM
+                                && subscription.getStatus() == SubscriptionStatus.ACTIVE
+                                && subscription.getEndDate() != null
+                                && subscription.getEndDate().isAfter(now))
+                .map(subscription -> subscription.getUser().getId())
+                .collect(Collectors.toSet());
+    }
+
+    private SubscriptionRepository subscriptionsRepository() {
+        return subscriptionRepository;
     }
 
     private String toPhotoDataUri(User user) {
@@ -292,7 +470,7 @@ Keep an eye on your inbox for match requests 👀
         }
 
         String base64 =
-                java.util.Base64
+                Base64
                         .getEncoder()
                         .encodeToString(user.getProfilePhoto());
 
@@ -487,9 +665,8 @@ Keep an eye on your inbox for match requests 👀
             }
         }
 
-        List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
-        TravelPlan myLatestPlan = myPlans.stream()
-                .max(Comparator.comparing(TravelPlan::getCreatedAt))
+        TravelPlan myLatestPlan = travelPlanRepository
+                .findTopByUserIdOrderByCreatedAtDesc(currentUser.getId())
                 .orElse(null);
 
         return toFeedPostResponse(plan, currentUser, myLatestPlan);
@@ -507,9 +684,8 @@ Keep an eye on your inbox for match requests 👀
         plan.setShareCount((plan.getShareCount() == null ? 0 : plan.getShareCount()) + 1);
         travelPlanRepository.save(plan);
 
-        List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
-        TravelPlan myLatestPlan = myPlans.stream()
-                .max(Comparator.comparing(TravelPlan::getCreatedAt))
+        TravelPlan myLatestPlan = travelPlanRepository
+                .findTopByUserIdOrderByCreatedAtDesc(currentUser.getId())
                 .orElse(null);
 
         return toFeedPostResponse(plan, currentUser, myLatestPlan);

@@ -12,6 +12,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Table(
+        indexes = {
+                @Index(name = "idx_match_receiver_created", columnList = "receiver_id,created_at"),
+                @Index(name = "idx_match_sender_created", columnList = "sender_id,created_at"),
+                @Index(name = "idx_match_plan", columnList = "travel_plan_id")
+        },
         uniqueConstraints = @UniqueConstraint(
                 columnNames = {"sender_id", "travel_plan_id"}
         )

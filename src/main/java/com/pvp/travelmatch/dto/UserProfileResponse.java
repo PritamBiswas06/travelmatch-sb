@@ -58,4 +58,11 @@ public class UserProfileResponse {
 
     private List<FriendResponse> friends;
     private long friendCount;
+
+    // Pagination metadata for profile lists. Additive fields keep the existing
+    // profile UI compatible while preventing unbounded profile payloads.
+    private boolean postsHasMore;
+    private boolean memoriesHasMore;
+    private boolean friendsHasMore;
+    private boolean reviewsHasMore;
 }

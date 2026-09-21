@@ -1,6 +1,8 @@
 package com.pvp.travelmatch.controller;
 
 import com.pvp.travelmatch.entity.MatchRequest;
+import com.pvp.travelmatch.dto.MatchRequestResponse;
+import org.springframework.data.domain.Page;
 import com.pvp.travelmatch.service.MatchRequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -34,8 +36,10 @@ public class MatchRequestController {
 
     // View my incoming requests
     @GetMapping("/my")
-    public List<MatchRequest> myRequests() {
-        return matchRequestService.getMyRequests();
+    public Page<MatchRequestResponse> myRequests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return matchRequestService.getMyRequests(page, size);
     }
 
     @GetMapping("/api/match/{planId}")

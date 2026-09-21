@@ -2,6 +2,8 @@ package com.pvp.travelmatch.controller;
 
 import com.pvp.travelmatch.dto.FeedFilterRequest;
 import com.pvp.travelmatch.dto.FeedPostResponse;
+import com.pvp.travelmatch.dto.FeedPageResponse;
+import org.springframework.data.domain.Page;
 import com.pvp.travelmatch.dto.MatchResponse;
 import com.pvp.travelmatch.dto.TravelPlanRequest;
 import com.pvp.travelmatch.entity.TravelPlan;
@@ -50,7 +52,7 @@ public class TravelPlanController {
     // ==================== FEED ====================
 
     @GetMapping("/feed")
-    public List<FeedPostResponse> getFeed(
+    public FeedPageResponse getFeed(
             @RequestParam(required = false, defaultValue = "latest") String sort,
             @RequestParam(required = false) String destination,
             @RequestParam(required = false) String fromLocation,
@@ -62,7 +64,9 @@ public class TravelPlanController {
             @RequestParam(required = false) Integer minMatchScore,
             @RequestParam(required = false) Integer minAge, @RequestParam(required = false) Integer maxAge,
             @RequestParam(required = false) String travelStyle, @RequestParam(required = false) String travelInterest,
-            @RequestParam(required = false) String language, @RequestParam(required = false) String country, @RequestParam(required = false) String city
+            @RequestParam(required = false) String language, @RequestParam(required = false) String country, @RequestParam(required = false) String city,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size
     ) {
         FeedFilterRequest filter = FeedFilterRequest.builder()
                 .destination(destination)
@@ -75,7 +79,7 @@ public class TravelPlanController {
                 .minMatchScore(minMatchScore).minAge(minAge).maxAge(maxAge).travelStyle(travelStyle).travelInterest(travelInterest).language(language).country(country).city(city)
                 .build();
 
-        return travelPlanService.getFeed(sort, filter);
+        return travelPlanService.getFeed(sort, filter, page, size);
     }
 
     @PostMapping("/{planId}/like")
