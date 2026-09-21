@@ -25,11 +25,16 @@ public class TravelPlanController {
         return travelPlanService.createPlan(request);
     }
 
-    @PutMapping("/{planId}")
-    public TravelPlan updatePlan(
-            @PathVariable Long planId,
-            @RequestBody TravelPlanRequest request) {
-        return travelPlanService.updatePlan(planId, request);
+    /**
+     * Returns one exact travel post with the same viewer-specific data used by
+     * the travel feed (reactions, save state, match status, compatibility, etc.).
+     *
+     * This endpoint is required for Dashboard/Upcoming Trips because the feed
+     * intentionally excludes the current user's own posts.
+     */
+    @GetMapping("/{planId}")
+    public FeedPostResponse getTravelPost(@PathVariable Long planId) {
+        return travelPlanService.getTravelPost(planId);
     }
 
     @GetMapping("/{planId}/matches")

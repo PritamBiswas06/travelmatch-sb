@@ -20,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -138,44 +137,25 @@ Keep an eye on your inbox for match requests 👀
         return savedPlan;
     }
 
-    @Transactional
-    public TravelPlan updatePlan(Long planId, TravelPlanRequest request) {
+    /**
+     * Load one exact travel post for the currently authenticated viewer.
+     * Unlike getFeed(), this does not exclude the viewer's own posts.
+     */
+    public FeedPostResponse getTravelPost(Long planId) {
         User currentUser = getCurrentUser();
 
-        if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trip details are required");
-        }
-
         TravelPlan plan = travelPlanRepository.findById(planId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Travel plan not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Travel post not found"
+                ));
 
-        if (plan.getUser() == null || !plan.getUser().getId().equals(currentUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own travel posts");
-        }
+        List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
+        TravelPlan myLatestPlan = myPlans.stream()
+                .max(Comparator.comparing(TravelPlan::getCreatedAt))
+                .orElse(null);
 
-        if (request.getFromLocation() == null || request.getFromLocation().isBlank()
-                || request.getDestination() == null || request.getDestination().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "From location and destination are required");
-        }
-        if (request.getStartDate() == null || request.getEndDate() == null
-                || request.getEndDate().isBefore(request.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please provide valid travel dates");
-        }
-        if (request.getBudget() == null || request.getBudget() < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Budget cannot be negative");
-        }
-        if (request.getTravelType() == null || request.getTravelType().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Travel type is required");
-        }
-
-        plan.setFromLocation(request.getFromLocation().trim());
-        plan.setDestination(request.getDestination().trim());
-        plan.setStartDate(request.getStartDate());
-        plan.setEndDate(request.getEndDate());
-        plan.setBudget(request.getBudget());
-        plan.setTravelType(request.getTravelType().trim());
-
-        return travelPlanRepository.save(plan);
+        return toFeedPostResponse(plan, currentUser, myLatestPlan);
     }
 
     public List<MatchResponse> findMatches(Long planId) {
@@ -269,12 +249,6 @@ Keep an eye on your inbox for match requests 👀
         List<TravelPlan> feedPlans =
                 travelPlanRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        Set<Long> friendIds = travelPartnerRepository.findByUserOneOrUserTwo(currentUser, currentUser).stream()
-                .map(partner -> partner.getUserOne().getId().equals(currentUser.getId())
-                        ? partner.getUserTwo().getId()
-                        : partner.getUserOne().getId())
-                .collect(java.util.stream.Collectors.toSet());
-
         // Used to compute an optional match score against the viewer's own trips
         List<TravelPlan> myPlans = travelPlanRepository.findByUser(currentUser);
         TravelPlan myLatestPlan = myPlans.stream()
@@ -282,7 +256,7 @@ Keep an eye on your inbox for match requests 👀
                 .orElse(null);
 
         List<FeedPostResponse> posts = feedPlans.stream()
-                .map(plan -> toFeedPostResponse(plan, currentUser, myLatestPlan, friendIds))
+                .map(plan -> toFeedPostResponse(plan, currentUser, myLatestPlan))
                 .collect(java.util.stream.Collectors.toList());
 
         // Match score isn't a DB column (it's computed per-viewer), so the
@@ -330,8 +304,7 @@ Keep an eye on your inbox for match requests 👀
     private FeedPostResponse toFeedPostResponse(
             TravelPlan plan,
             User currentUser,
-            TravelPlan myLatestPlan,
-            Set<Long> friendIds) {
+            TravelPlan myLatestPlan) {
 
         long likeCount =
                 postReactionRepository.countByTravelPlanAndReactionType(
@@ -351,18 +324,14 @@ Keep an eye on your inbox for match requests 👀
                         .map(PostReaction::getReactionType)
                         .orElse(null);
 
-        String matchRequestStatus;
-        if (friendIds.contains(plan.getUser().getId())) {
-            matchRequestStatus = "FRIENDS";
-        } else {
-            matchRequestStatus = matchRequestRepository
-                    .findBySenderIdAndTravelPlanId(
-                            currentUser.getId(),
-                            plan.getId()
-                    )
-                    .map(MatchRequest::getStatus)
-                    .orElse("NONE");
-        }
+        String matchRequestStatus =
+                matchRequestRepository
+                        .findBySenderIdAndTravelPlanId(
+                                currentUser.getId(),
+                                plan.getId()
+                        )
+                        .map(MatchRequest::getStatus)
+                        .orElse("NONE");
 
         CompatibilityService.CompatibilityResult compatibility =
                 compatibilityService.calculate(
@@ -523,11 +492,7 @@ Keep an eye on your inbox for match requests 👀
                 .max(Comparator.comparing(TravelPlan::getCreatedAt))
                 .orElse(null);
 
-        return toFeedPostResponse(plan, currentUser, myLatestPlan,
-                travelPartnerRepository.findByUserOneOrUserTwo(currentUser, currentUser).stream()
-                        .map(partner -> partner.getUserOne().getId().equals(currentUser.getId())
-                                ? partner.getUserTwo().getId() : partner.getUserOne().getId())
-                        .collect(java.util.stream.Collectors.toSet()));
+        return toFeedPostResponse(plan, currentUser, myLatestPlan);
     }
 
     // ==================== SHARE ====================
@@ -547,11 +512,7 @@ Keep an eye on your inbox for match requests 👀
                 .max(Comparator.comparing(TravelPlan::getCreatedAt))
                 .orElse(null);
 
-        return toFeedPostResponse(plan, currentUser, myLatestPlan,
-                travelPartnerRepository.findByUserOneOrUserTwo(currentUser, currentUser).stream()
-                        .map(partner -> partner.getUserOne().getId().equals(currentUser.getId())
-                                ? partner.getUserTwo().getId() : partner.getUserOne().getId())
-                        .collect(java.util.stream.Collectors.toSet()));
+        return toFeedPostResponse(plan, currentUser, myLatestPlan);
     }
 
     @Transactional
