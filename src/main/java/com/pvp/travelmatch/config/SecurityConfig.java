@@ -34,6 +34,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/monetization/webhook/razorpay").permitAll()
+                        // Profile photos are static image resources. They must be
+                        // fetchable by a normal <img> request, which cannot attach
+                        // the Angular JWT interceptor header. Upload/update APIs
+                        // remain fully authenticated below.
+                        .requestMatchers(HttpMethod.GET, "/api/users/*/photo").permitAll()
                         // Server-side role check. Angular's adminGuard is only UX.
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

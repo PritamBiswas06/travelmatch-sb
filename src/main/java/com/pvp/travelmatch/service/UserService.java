@@ -8,7 +8,14 @@ import com.pvp.travelmatch.entity.MatchRequest;
 import com.pvp.travelmatch.entity.PostReaction;
 import com.pvp.travelmatch.entity.TravelPlan;
 import com.pvp.travelmatch.entity.User;
-import com.pvp.travelmatch.repository.*;
+import com.pvp.travelmatch.repository.MatchRequestRepository;
+import com.pvp.travelmatch.repository.PostReactionRepository;
+import com.pvp.travelmatch.repository.SavedTravelPlanRepository;
+import com.pvp.travelmatch.repository.TravelCommentRepository;
+import com.pvp.travelmatch.repository.TravelMemoryRepository;
+import com.pvp.travelmatch.repository.TravelPlanRepository;
+import com.pvp.travelmatch.repository.TravelPartnerRepository;
+import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -131,7 +138,7 @@ public class UserService {
 
         var reviewsPage = travelerReviewService.getForUserPageResult(
                 targetUser.getId(), profilePage);
-        List<TravelerReviewResponse> reviews =
+        List<com.pvp.travelmatch.dto.TravelerReviewResponse> reviews =
                 reviewsPage.getContent();
 
         return buildProfileResponse(
@@ -204,7 +211,7 @@ public class UserService {
                         )
                 )
 
-.reviews(reviews)
+                .reviews(reviews)
                 .friends(friends)
                 .friendCount(friendCount)
                 .postsHasMore(postsHasMore)
@@ -264,7 +271,7 @@ public class UserService {
         boolean partners = !isOwnProfile
                 && plans.get(0).getUser() != null
                 && travelPartnerRepository.arePartners(
-                        currentUser, plans.get(0).getUser());
+                currentUser, plans.get(0).getUser());
 
         return plans.stream()
                 .map(plan -> ProfileTripResponse.builder()
@@ -286,9 +293,9 @@ public class UserService {
                                 isOwnProfile
                                         ? null
                                         : partners
-                                            ? "FRIENDS"
-                                            : requestStatuses.getOrDefault(
-                                                plan.getId(), "NONE"))
+                                        ? "FRIENDS"
+                                        : requestStatuses.getOrDefault(
+                                        plan.getId(), "NONE"))
                         .build())
                 .toList();
     }
@@ -307,7 +314,7 @@ public class UserService {
         }
 
         String reaction = postReactionRepository.findByTravelPlanAndUser(plan, currentUser)
-                .map(PostReaction::getReactionType)
+                .map(com.pvp.travelmatch.entity.PostReaction::getReactionType)
                 .orElse(null);
 
         return ProfileTripResponse.builder()
@@ -450,6 +457,7 @@ public class UserService {
         try {
             currentUser.setProfilePhoto(file.getBytes());
             currentUser.setProfilePhotoContentType(contentType);
+            currentUser.setProfilePhotoUpdatedAt(java.time.LocalDateTime.now());
         } catch (Exception e) {
             throw new RuntimeException("Could not read uploaded photo");
         }
@@ -465,6 +473,7 @@ public class UserService {
 
         currentUser.setProfilePhoto(null);
         currentUser.setProfilePhotoContentType(null);
+        currentUser.setProfilePhotoUpdatedAt(null);
 
         userRepository.save(currentUser);
 
@@ -492,7 +501,22 @@ public class UserService {
 
         // Do not access the LONGBLOB while building profile JSON.
         // The browser fetches the image through the dedicated photo endpoint.
-        return "/api/users/" + user.getId() + "/photo";
+        // The content type is a lightweight column and tells us whether a
+        // photo has been stored. Do not call getProfilePhoto() here because
+        // that would initialize the LONGBLOB while building JSON.
+        if (user.getProfilePhotoContentType() == null
+                || user.getProfilePhotoContentType().isBlank()) {
+            return null;
+        }
+
+        String url = "/api/users/" + user.getId() + "/photo";
+        if (user.getProfilePhotoUpdatedAt() != null) {
+            url += "?v=" + user.getProfilePhotoUpdatedAt()
+                    .atZone(java.time.ZoneOffset.UTC)
+                    .toInstant()
+                    .toEpochMilli();
+        }
+        return url;
     }
 
     private String validateAndNormalizeUsername(String rawUsername, Long currentUserId) {

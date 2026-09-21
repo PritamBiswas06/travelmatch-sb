@@ -120,6 +120,10 @@ public class User {
 
     private String profilePhotoContentType;
 
+    // Changes whenever the profile photo changes. It is used only as a
+    // cache-busting version in the photo URL; the image bytes stay in the LONGBLOB.
+    private LocalDateTime profilePhotoUpdatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

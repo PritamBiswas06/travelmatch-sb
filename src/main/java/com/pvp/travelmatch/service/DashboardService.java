@@ -6,7 +6,11 @@ import com.pvp.travelmatch.dto.DashboardTripResponse;
 import com.pvp.travelmatch.dto.DestinationSummaryResponse;
 import com.pvp.travelmatch.dto.NotificationResponse;
 import com.pvp.travelmatch.entity.User;
-import com.pvp.travelmatch.repository.*;
+import com.pvp.travelmatch.repository.MatchRequestRepository;
+import com.pvp.travelmatch.repository.NotificationRepository;
+import com.pvp.travelmatch.repository.TravelPartnerRepository;
+import com.pvp.travelmatch.repository.TravelPlanRepository;
+import com.pvp.travelmatch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -123,6 +127,7 @@ public class DashboardService {
                 notificationRepository.countByReceiverIdAndIsReadFalse(
                         userId
                 ),
+                "/api/users/" + userId + "/photo",
                 plans,
                 partners,
                 notifications,

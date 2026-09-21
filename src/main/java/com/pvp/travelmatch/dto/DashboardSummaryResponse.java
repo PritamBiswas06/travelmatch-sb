@@ -15,6 +15,7 @@ public class DashboardSummaryResponse {
     private long partnerCount;
     private long requestCount;
     private long unreadNotificationCount;
+    private String profilePhotoUrl;
 
     private List<DashboardTripResponse> plans;
     private List<DashboardPartnerResponse> partners;
