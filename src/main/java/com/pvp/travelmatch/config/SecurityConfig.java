@@ -55,7 +55,12 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
                 "https://tripmatch.fun",
                 "https://www.tripmatch.fun",
-                "http://localhost:4200"
+                "http://localhost:4200",
+
+                "http://localhost",
+                "https://localhost",
+                "capacitor://localhost"
+
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
