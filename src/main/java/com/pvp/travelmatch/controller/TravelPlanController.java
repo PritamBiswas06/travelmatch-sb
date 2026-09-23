@@ -38,6 +38,11 @@ public class TravelPlanController {
         return travelPlanService.getTravelPost(planId);
     }
 
+    @PutMapping("/{planId}")
+    public TravelPlan updatePlan(@PathVariable Long planId, @RequestBody TravelPlanRequest request) {
+        return travelPlanService.updatePlan(planId, request);
+    }
+
     @GetMapping("/{planId}/matches")
     public List<MatchResponse> getMatches(@PathVariable Long planId) {
         return travelPlanService.findMatches(planId);
@@ -60,6 +65,9 @@ public class TravelPlanController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String travelType,
+            @RequestParam(required = false) String groupType,
+            @RequestParam(required = false) String lookingFor,
+            @RequestParam(required = false) Boolean openForJoining,
             @RequestParam(required = false) Integer minMatchScore,
             @RequestParam(required = false) Integer minAge, @RequestParam(required = false) Integer maxAge,
             @RequestParam(required = false) String travelStyle, @RequestParam(required = false) String travelInterest,
@@ -74,7 +82,7 @@ public class TravelPlanController {
                 .maxBudget(maxBudget)
                 .startDate(startDate)
                 .endDate(endDate)
-                .travelType(travelType)
+                .travelType(travelType).groupType(groupType).lookingFor(lookingFor).openForJoining(openForJoining)
                 .minMatchScore(minMatchScore).minAge(minAge).maxAge(maxAge).travelStyle(travelStyle).travelInterest(travelInterest).language(language).country(country).city(city)
                 .build();
 

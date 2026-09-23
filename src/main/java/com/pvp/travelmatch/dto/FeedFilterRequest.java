@@ -22,6 +22,9 @@ public class FeedFilterRequest {
     private LocalDate startDate;     // trip must overlap this range
     private LocalDate endDate;
     private String travelType;       // exact, case-insensitive
+    private String groupType;
+    private String lookingFor;
+    private Boolean openForJoining;
     private Integer minMatchScore;
     private Integer minAge; private Integer maxAge; private String travelStyle; private String travelInterest; private String language; private String country; private String city;   // applied after scoring, not a DB column
 }

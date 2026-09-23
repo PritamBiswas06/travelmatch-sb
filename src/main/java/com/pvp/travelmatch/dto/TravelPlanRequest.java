@@ -12,4 +12,12 @@ public class TravelPlanRequest {
     private LocalDate endDate;
     private Double budget;
     private String travelType;
+    private String groupType;
+    private Integer currentGroupSize;
+    private Integer minGroupSize;
+    private Integer maxGroupSize;
+    private String lookingFor;
+    private Boolean openForJoining;
+    private Boolean familyFriendly;
+    private Boolean childrenAllowed;
 }

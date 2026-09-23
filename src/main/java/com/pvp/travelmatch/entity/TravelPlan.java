@@ -40,6 +40,15 @@ public class TravelPlan {
 
     private String travelType;
 
+    private String groupType;
+    private Integer currentGroupSize;
+    private Integer minGroupSize;
+    private Integer maxGroupSize;
+    private String lookingFor;
+    private Boolean openForJoining;
+    private Boolean familyFriendly;
+    private Boolean childrenAllowed;
+
     private LocalDateTime createdAt;
 
     @Builder.Default

@@ -56,6 +56,8 @@ public class TravelPlanService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        validateGroupFields(request);
+
         TravelPlan plan = TravelPlan.builder()
                 .fromLocation(request.getFromLocation())
                 .destination(request.getDestination())
@@ -63,6 +65,14 @@ public class TravelPlanService {
                 .endDate(request.getEndDate())
                 .budget(request.getBudget())
                 .travelType(request.getTravelType())
+                .groupType(request.getGroupType())
+                .currentGroupSize(request.getCurrentGroupSize())
+                .minGroupSize(request.getMinGroupSize())
+                .maxGroupSize(request.getMaxGroupSize())
+                .lookingFor(request.getLookingFor())
+                .openForJoining(request.getOpenForJoining())
+                .familyFriendly(request.getFamilyFriendly())
+                .childrenAllowed(request.getChildrenAllowed())
                 .createdAt(LocalDateTime.now())
                 .user(user)
                 .build();
@@ -216,6 +226,42 @@ Keep an eye on your inbox for match requests 👀
     }
 
 
+    public TravelPlan updatePlan(Long planId, TravelPlanRequest request) {
+        User currentUser = getCurrentUser();
+        TravelPlan plan = travelPlanRepository.findById(planId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Travel post not found"));
+        if (!plan.getUser().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own travel plans");
+        }
+        validateGroupFields(request);
+        plan.setFromLocation(request.getFromLocation());
+        plan.setDestination(request.getDestination());
+        plan.setStartDate(request.getStartDate());
+        plan.setEndDate(request.getEndDate());
+        plan.setBudget(request.getBudget());
+        plan.setTravelType(request.getTravelType());
+        plan.setGroupType(request.getGroupType());
+        plan.setCurrentGroupSize(request.getCurrentGroupSize());
+        plan.setMinGroupSize(request.getMinGroupSize());
+        plan.setMaxGroupSize(request.getMaxGroupSize());
+        plan.setLookingFor(request.getLookingFor());
+        plan.setOpenForJoining(request.getOpenForJoining());
+        plan.setFamilyFriendly(request.getFamilyFriendly());
+        plan.setChildrenAllowed(request.getChildrenAllowed());
+        return travelPlanRepository.save(plan);
+    }
+
+    private void validateGroupFields(TravelPlanRequest request) {
+        String groupType = request.getGroupType();
+        if (groupType == null || groupType.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group type is required");
+        Set<String> allowed = Set.of("SOLO", "COUPLE", "FAMILY", "GROUP", "OPEN_GROUP");
+        if (!allowed.contains(groupType.toUpperCase())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid group type");
+        int current = request.getCurrentGroupSize() == null ? 1 : request.getCurrentGroupSize();
+        int min = request.getMinGroupSize() == null ? current : request.getMinGroupSize();
+        int max = request.getMaxGroupSize() == null ? Math.max(current, min) : request.getMaxGroupSize();
+        if (current < 1 || min < 1 || max < min || current > max) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid group size range");
+    }
+
     public List<TravelPlan> getMyPlans() {
         String email = (String) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
@@ -265,21 +311,24 @@ Keep an eye on your inbox for match requests 👀
         boolean simpleLatestFeed =
                 "latest".equalsIgnoreCase(sortBy)
                         && (filter == null
-                            || (filter.getDestination() == null
-                                && filter.getFromLocation() == null
-                                && filter.getMinBudget() == null
-                                && filter.getMaxBudget() == null
-                                && filter.getStartDate() == null
-                                && filter.getEndDate() == null
-                                && filter.getTravelType() == null
-                                && filter.getMinMatchScore() == null
-                                && filter.getMinAge() == null
-                                && filter.getMaxAge() == null
-                                && filter.getTravelStyle() == null
-                                && filter.getTravelInterest() == null
-                                && filter.getLanguage() == null
-                                && filter.getCountry() == null
-                                && filter.getCity() == null));
+                        || (filter.getDestination() == null
+                        && filter.getFromLocation() == null
+                        && filter.getMinBudget() == null
+                        && filter.getMaxBudget() == null
+                        && filter.getStartDate() == null
+                        && filter.getEndDate() == null
+                        && filter.getTravelType() == null
+                        && filter.getGroupType() == null
+                        && filter.getLookingFor() == null
+                        && filter.getOpenForJoining() == null
+                        && filter.getMinMatchScore() == null
+                        && filter.getMinAge() == null
+                        && filter.getMaxAge() == null
+                        && filter.getTravelStyle() == null
+                        && filter.getTravelInterest() == null
+                        && filter.getLanguage() == null
+                        && filter.getCountry() == null
+                        && filter.getCity() == null));
 
         boolean hasMore;
         List<TravelPlan> feedPlans;
@@ -342,11 +391,11 @@ Keep an eye on your inbox for match requests 👀
         } else if ("match".equalsIgnoreCase(sortBy)) {
             posts = posts.stream()
                     .sorted(Comparator.comparing(
-                            (FeedPostResponse p) ->
-                                    p.getMatchScore() == null ? -1 : p.getMatchScore()
-                    ).reversed()
-                    .thenComparing(FeedPostResponse::getCreatedAt,
-                            Comparator.reverseOrder()))
+                                    (FeedPostResponse p) ->
+                                            p.getMatchScore() == null ? -1 : p.getMatchScore()
+                            ).reversed()
+                            .thenComparing(FeedPostResponse::getCreatedAt,
+                                    Comparator.reverseOrder()))
                     .toList();
         }
 
@@ -472,6 +521,14 @@ Keep an eye on your inbox for match requests 👀
                             .endDate(plan.getEndDate())
                             .budget(plan.getBudget())
                             .travelType(plan.getTravelType())
+                            .groupType(plan.getGroupType() == null ? "SOLO" : plan.getGroupType())
+                            .currentGroupSize(plan.getCurrentGroupSize() == null ? 1 : plan.getCurrentGroupSize())
+                            .minGroupSize(plan.getMinGroupSize() == null ? 1 : plan.getMinGroupSize())
+                            .maxGroupSize(plan.getMaxGroupSize() == null ? 1 : plan.getMaxGroupSize())
+                            .lookingFor(plan.getLookingFor() == null ? "INDIVIDUALS" : plan.getLookingFor())
+                            .openForJoining(Boolean.TRUE.equals(plan.getOpenForJoining()))
+                            .familyFriendly(Boolean.TRUE.equals(plan.getFamilyFriendly()))
+                            .childrenAllowed(Boolean.TRUE.equals(plan.getChildrenAllowed()))
                             .status(plan.getStatus())
                             .createdAt(plan.getCreatedAt())
                             .matchScore(compatibility.score())
@@ -486,7 +543,7 @@ Keep an eye on your inbox for match requests 👀
                                     partnerOwnerIds.contains(owner.getId())
                                             ? "FRIENDS"
                                             : requestStatuses.getOrDefault(
-                                                    plan.getId(), "NONE"))
+                                            plan.getId(), "NONE"))
                             .premiumUser(premiumUserIds.contains(owner.getId()))
                             .boosted(boost != null)
                             .boostMultiplier(
@@ -597,6 +654,14 @@ Keep an eye on your inbox for match requests 👀
                 .endDate(plan.getEndDate())
                 .budget(plan.getBudget())
                 .travelType(plan.getTravelType())
+                .groupType(plan.getGroupType() == null ? "SOLO" : plan.getGroupType())
+                .currentGroupSize(plan.getCurrentGroupSize() == null ? 1 : plan.getCurrentGroupSize())
+                .minGroupSize(plan.getMinGroupSize() == null ? 1 : plan.getMinGroupSize())
+                .maxGroupSize(plan.getMaxGroupSize() == null ? 1 : plan.getMaxGroupSize())
+                .lookingFor(plan.getLookingFor() == null ? "INDIVIDUALS" : plan.getLookingFor())
+                .openForJoining(Boolean.TRUE.equals(plan.getOpenForJoining()))
+                .familyFriendly(Boolean.TRUE.equals(plan.getFamilyFriendly()))
+                .childrenAllowed(Boolean.TRUE.equals(plan.getChildrenAllowed()))
                 .status(plan.getStatus())
                 .createdAt(plan.getCreatedAt())
 

@@ -43,6 +43,7 @@ public class CompatibilityService {
         factors.add(dateOverlapFactor(viewerPlan, candidatePlan));
         factors.add(budgetFactor(viewerPlan, candidatePlan));
         factors.add(travelTypeFactor(viewerPlan, candidatePlan));
+        factors.add(groupCompatibilityFactor(viewerPlan, candidatePlan));
         factors.add(overlapFactor("Travel Interests", 10, viewer.getTravelInterests(), candidateUser.getTravelInterests()));
         factors.add(overlapFactor("Travel Style", 10, viewer.getTravelStyle(), candidateUser.getTravelStyle()));
         factors.add(overlapFactor("Preferred Destinations", 5, viewer.getPreferredDestinations(), candidateUser.getPreferredDestinations()));
@@ -123,6 +124,36 @@ public class CompatibilityService {
         double budgetPercent = 1 - (budgetDiff / viewerPlan.getBudget());
         int earned = (int) Math.round(Math.max(0, budgetPercent) * 15);
         return new Factor("Budget", 15, earned);
+    }
+
+    private Factor groupCompatibilityFactor(TravelPlan viewerPlan, TravelPlan candidatePlan) {
+        if (viewerPlan == null || isBlank(viewerPlan.getGroupType()) || isBlank(candidatePlan.getGroupType())) {
+            return new Factor("Group Compatibility", 10, null);
+        }
+
+        int earned = 0;
+        if (viewerPlan.getGroupType().equalsIgnoreCase(candidatePlan.getGroupType())) {
+            earned += 6;
+        }
+        if (isBlank(viewerPlan.getLookingFor()) || isBlank(candidatePlan.getLookingFor())) {
+            earned += 0;
+        } else if (viewerPlan.getLookingFor().equalsIgnoreCase("ANYONE")
+                || candidatePlan.getLookingFor().equalsIgnoreCase("ANYONE")
+                || lookingForMatches(viewerPlan.getLookingFor(), candidatePlan.getGroupType())
+                || lookingForMatches(candidatePlan.getLookingFor(), viewerPlan.getGroupType())) {
+            earned += 4;
+        }
+        return new Factor("Group Compatibility", 10, Math.min(10, earned));
+    }
+
+    private boolean lookingForMatches(String lookingFor, String groupType) {
+        return switch (lookingFor.toUpperCase()) {
+            case "INDIVIDUALS" -> "SOLO".equalsIgnoreCase(groupType);
+            case "FAMILIES" -> "FAMILY".equalsIgnoreCase(groupType);
+            case "GROUPS" -> "GROUP".equalsIgnoreCase(groupType) || "OPEN_GROUP".equalsIgnoreCase(groupType);
+            case "ANYONE" -> true;
+            default -> false;
+        };
     }
 
     private Factor travelTypeFactor(TravelPlan viewerPlan, TravelPlan candidatePlan) {

@@ -100,6 +100,16 @@ public final class TravelPlanSpecifications {
                     ));
                 }
 
+                if (hasText(filter.getGroupType())) {
+                    predicates.add(cb.equal(cb.lower(root.get("groupType")), filter.getGroupType().trim().toLowerCase()));
+                }
+                if (hasText(filter.getLookingFor())) {
+                    predicates.add(cb.equal(cb.lower(root.get("lookingFor")), filter.getLookingFor().trim().toLowerCase()));
+                }
+                if (filter.getOpenForJoining() != null) {
+                    predicates.add(cb.equal(root.get("openForJoining"), filter.getOpenForJoining()));
+                }
+
                 // Date-range overlap: only constrain the side(s) the user actually provided.
                 if (filter.getStartDate() != null) {
                     predicates.add(cb.greaterThanOrEqualTo(root.get("endDate"), filter.getStartDate()));
