@@ -2,6 +2,7 @@ package com.pvp.travelmatch.controller;
 
 import com.pvp.travelmatch.dto.AuthResponse;
 import com.pvp.travelmatch.dto.LoginRequest;
+import com.pvp.travelmatch.dto.ResetPasswordRequest;
 import com.pvp.travelmatch.entity.AccountStatus;
 import com.pvp.travelmatch.entity.Role;
 import com.pvp.travelmatch.entity.User;
@@ -65,6 +66,7 @@ public class AuthController {
              * generate a new OTP.
              */
             dbUser.setVerificationCode(generateOTP());
+
             dbUser.setCodeExpiry(
                     LocalDateTime.now().plusMinutes(10)
             );
@@ -617,11 +619,10 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public Map<String, String> resetPassword(
-            @RequestParam String email,
-            @RequestParam String password) {
+            @RequestBody ResetPasswordRequest request) {
 
         User user =
-                userRepository.findByEmail(email)
+                userRepository.findByEmail(request.getEmail())
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "User not found"
@@ -629,8 +630,19 @@ public class AuthController {
                         );
 
 
+        /*
+         * Password is now received in the JSON body.
+         *
+         * This allows passwords containing:
+         *
+         * @  #  +  &  ?  %  =  !  etc.
+         *
+         * to reach the backend without URL encoding issues.
+         */
         user.setPassword(
-                passwordEncoder.encode(password)
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
         );
 
 
