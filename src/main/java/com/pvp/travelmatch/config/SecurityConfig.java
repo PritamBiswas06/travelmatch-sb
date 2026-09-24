@@ -1,6 +1,8 @@
 package com.pvp.travelmatch.config;
 
 import com.pvp.travelmatch.security.JwtAuthFilter;
+import com.pvp.travelmatch.security.OAuth2FailureHandler;
+import com.pvp.travelmatch.security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +26,8 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final OAuth2SuccessHandler oauth2SuccessHandler;
+    private final OAuth2FailureHandler oauth2FailureHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -33,17 +37,27 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/oauth2/**").permitAll()
+                        .requestMatchers("/api/login/oauth2/**").permitAll()
+                        .requestMatchers("/oauth2/**").permitAll()
+                        .requestMatchers("/login/oauth2/**").permitAll()
                         .requestMatchers("/api/monetization/webhook/razorpay").permitAll()
-                        // Profile photos are static image resources. They must be
-                        // fetchable by a normal <img> request, which cannot attach
-                        // the Angular JWT interceptor header. Upload/update APIs
-                        // remain fully authenticated below.
                         .requestMatchers(HttpMethod.GET, "/api/users/*/photo").permitAll()
-                        // Server-side role check. Angular's adminGuard is only UX.
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // OAuth2 login needs a short-lived HTTP session during the
+                // authorization-code handshake. JWT authentication remains
+                // the authentication mechanism used by the TravelMatch API.
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(endpoint ->
+                                endpoint.baseUri("/api/oauth2/authorization"))
+                        .redirectionEndpoint(endpoint ->
+                                endpoint.baseUri("/api/login/oauth2/code/*"))
+                        .successHandler(oauth2SuccessHandler)
+                        .failureHandler(oauth2FailureHandler)
+                )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -56,11 +70,9 @@ public class SecurityConfig {
                 "https://tripmatch.fun",
                 "https://www.tripmatch.fun",
                 "http://localhost:4200",
-
                 "http://localhost",
                 "https://localhost",
                 "capacitor://localhost"
-
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
