@@ -192,6 +192,16 @@ public class UserService {
                 .travelFrequency(user.getTravelFrequency())
                 .languages(splitToList(user.getLanguages()))
                 .idealTravelPartner(user.getIdealTravelPartner())
+                .dnaAdventureRelaxation(user.getDnaAdventureRelaxation())
+                .dnaBudgetLuxury(user.getDnaBudgetLuxury())
+                .dnaSunriseNightlife(user.getDnaSunriseNightlife())
+                .dnaTrekkingSightseeing(user.getDnaTrekkingSightseeing())
+                .dnaFoodCulture(user.getDnaFoodCulture())
+                .dnaPlannedSpontaneous(user.getDnaPlannedSpontaneous())
+                .dnaSoloGroup(user.getDnaSoloGroup())
+                .dnaNatureCity(user.getDnaNatureCity())
+                .dnaPhotographyActivities(user.getDnaPhotographyActivities())
+                .dnaFastSlow(user.getDnaFastSlow())
                 .instagramUrl(user.getInstagramUrl())
                 .linkedinUrl(user.getLinkedinUrl())
                 .websiteUrl(user.getWebsiteUrl())
@@ -402,6 +412,17 @@ public class UserService {
             currentUser.setIdealTravelPartner(blankToNull(request.getIdealTravelPartner()));
         }
 
+        if (request.getDnaAdventureRelaxation() != null) currentUser.setDnaAdventureRelaxation(validateDna(request.getDnaAdventureRelaxation()));
+        if (request.getDnaBudgetLuxury() != null) currentUser.setDnaBudgetLuxury(validateDna(request.getDnaBudgetLuxury()));
+        if (request.getDnaSunriseNightlife() != null) currentUser.setDnaSunriseNightlife(validateDna(request.getDnaSunriseNightlife()));
+        if (request.getDnaTrekkingSightseeing() != null) currentUser.setDnaTrekkingSightseeing(validateDna(request.getDnaTrekkingSightseeing()));
+        if (request.getDnaFoodCulture() != null) currentUser.setDnaFoodCulture(validateDna(request.getDnaFoodCulture()));
+        if (request.getDnaPlannedSpontaneous() != null) currentUser.setDnaPlannedSpontaneous(validateDna(request.getDnaPlannedSpontaneous()));
+        if (request.getDnaSoloGroup() != null) currentUser.setDnaSoloGroup(validateDna(request.getDnaSoloGroup()));
+        if (request.getDnaNatureCity() != null) currentUser.setDnaNatureCity(validateDna(request.getDnaNatureCity()));
+        if (request.getDnaPhotographyActivities() != null) currentUser.setDnaPhotographyActivities(validateDna(request.getDnaPhotographyActivities()));
+        if (request.getDnaFastSlow() != null) currentUser.setDnaFastSlow(validateDna(request.getDnaFastSlow()));
+
         if (request.getInstagramUrl() != null) {
             currentUser.setInstagramUrl(validateAndNormalizeUrl(request.getInstagramUrl()));
         }
@@ -553,6 +574,13 @@ public class UserService {
         }
 
         return url;
+    }
+
+    private int validateDna(int value) {
+        if (value < 0 || value > 100) {
+            throw new RuntimeException("Travel DNA values must be between 0 and 100");
+        }
+        return value;
     }
 
     private String blankToNull(String value) {

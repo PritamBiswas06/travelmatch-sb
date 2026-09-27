@@ -49,6 +49,7 @@ public class CompatibilityService {
         factors.add(overlapFactor("Preferred Destinations", 5, viewer.getPreferredDestinations(), candidateUser.getPreferredDestinations()));
         factors.add(overlapFactor("Languages", 5, viewer.getLanguages(), candidateUser.getLanguages()));
         factors.add(exactMatchFactor("Travel Frequency", 5, viewer.getTravelFrequency(), candidateUser.getTravelFrequency()));
+        factors.add(travelDnaFactor(viewer, candidateUser));
 
         int possibleWeight = 0;
         int earnedWeight = 0;
@@ -194,6 +195,38 @@ public class CompatibilityService {
         }
         int earned = valueA.equalsIgnoreCase(valueB) ? weight : 0;
         return new Factor(label, weight, earned);
+    }
+
+    private Factor travelDnaFactor(User a, User b) {
+        Integer[] left = {
+                a.getDnaAdventureRelaxation(), a.getDnaBudgetLuxury(),
+                a.getDnaSunriseNightlife(), a.getDnaTrekkingSightseeing(),
+                a.getDnaFoodCulture(), a.getDnaPlannedSpontaneous(),
+                a.getDnaSoloGroup(), a.getDnaNatureCity(),
+                a.getDnaPhotographyActivities(), a.getDnaFastSlow()
+        };
+        Integer[] right = {
+                b.getDnaAdventureRelaxation(), b.getDnaBudgetLuxury(),
+                b.getDnaSunriseNightlife(), b.getDnaTrekkingSightseeing(),
+                b.getDnaFoodCulture(), b.getDnaPlannedSpontaneous(),
+                b.getDnaSoloGroup(), b.getDnaNatureCity(),
+                b.getDnaPhotographyActivities(), b.getDnaFastSlow()
+        };
+
+        int compared = 0;
+        double similarity = 0;
+        for (int i = 0; i < left.length; i++) {
+            if (left[i] == null || right[i] == null) continue;
+            compared++;
+            similarity += 1.0 - (Math.abs(left[i] - right[i]) / 100.0);
+        }
+
+        if (compared == 0) {
+            return new Factor("Travel DNA", 20, null);
+        }
+
+        int earned = (int) Math.round((similarity / compared) * 20);
+        return new Factor("Travel DNA", 20, Math.max(0, Math.min(20, earned)));
     }
 
     // ==================== HELPERS ====================

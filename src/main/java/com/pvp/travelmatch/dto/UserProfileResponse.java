@@ -38,6 +38,17 @@ public class UserProfileResponse {
     private List<String> languages;
     private String idealTravelPartner;
 
+    private Integer dnaAdventureRelaxation;
+    private Integer dnaBudgetLuxury;
+    private Integer dnaSunriseNightlife;
+    private Integer dnaTrekkingSightseeing;
+    private Integer dnaFoodCulture;
+    private Integer dnaPlannedSpontaneous;
+    private Integer dnaSoloGroup;
+    private Integer dnaNatureCity;
+    private Integer dnaPhotographyActivities;
+    private Integer dnaFastSlow;
+
     private String instagramUrl;
     private String linkedinUrl;
     private String websiteUrl;

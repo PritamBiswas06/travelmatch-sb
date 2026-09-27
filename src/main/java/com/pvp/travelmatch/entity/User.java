@@ -105,6 +105,39 @@ public class User {
     @Column(length = 500)
     private String idealTravelPartner;
 
+    // ==================== TRAVEL DNA (0-100) ====================
+    // 0 means the first side of the spectrum, 100 means the second side.
+    // Example: adventureRelaxation = 0 is strongly adventurous, 100 is strongly relaxed.
+    @Column(name = "dna_adventure_relaxation")
+    private Integer dnaAdventureRelaxation;
+
+    @Column(name = "dna_budget_luxury")
+    private Integer dnaBudgetLuxury;
+
+    @Column(name = "dna_sunrise_nightlife")
+    private Integer dnaSunriseNightlife;
+
+    @Column(name = "dna_trekking_sightseeing")
+    private Integer dnaTrekkingSightseeing;
+
+    @Column(name = "dna_food_culture")
+    private Integer dnaFoodCulture;
+
+    @Column(name = "dna_planned_spontaneous")
+    private Integer dnaPlannedSpontaneous;
+
+    @Column(name = "dna_solo_group")
+    private Integer dnaSoloGroup;
+
+    @Column(name = "dna_nature_city")
+    private Integer dnaNatureCity;
+
+    @Column(name = "dna_photography_activities")
+    private Integer dnaPhotographyActivities;
+
+    @Column(name = "dna_fast_slow")
+    private Integer dnaFastSlow;
+
     // Optional public social links — only shown if the user fills them in.
     private String instagramUrl;
     private String linkedinUrl;

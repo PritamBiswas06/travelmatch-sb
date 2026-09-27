@@ -55,6 +55,40 @@ public class TravelPlanController {
 
     // ==================== FEED ====================
 
+    /**
+     * Travel Radar: the same optimized feed pipeline, intentionally biased
+     * toward active plans that are open to new travelers. Keeping this in
+     * TravelPlanService means compatibility, blocking, pagination and the
+     * existing viewer-specific feed data all stay consistent.
+     */
+    @GetMapping("/radar")
+    public FeedPageResponse getRadar(
+            @RequestParam(required = false) String destination,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Double minBudget,
+            @RequestParam(required = false) Double maxBudget,
+            @RequestParam(required = false) String travelType,
+            @RequestParam(required = false) String groupType,
+            @RequestParam(required = false) Integer minMatchScore,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size
+    ) {
+        FeedFilterRequest filter = FeedFilterRequest.builder()
+                .destination(destination)
+                .minBudget(minBudget)
+                .maxBudget(maxBudget)
+                .startDate(startDate)
+                .endDate(endDate)
+                .travelType(travelType)
+                .groupType(groupType)
+                .openForJoining(true)
+                .minMatchScore(minMatchScore)
+                .build();
+
+        return travelPlanService.getFeed("match", filter, page, size);
+    }
+
     @GetMapping("/feed")
     public FeedPageResponse getFeed(
             @RequestParam(required = false, defaultValue = "latest") String sort,
