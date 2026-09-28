@@ -61,6 +61,10 @@ public class UserProfileResponse {
     // This is derived server-side from TravelPartner, never from client input.
     private boolean connectedToViewer;
 
+    // Relationship from the authenticated viewer to this profile:
+    // NONE / PENDING / FRIENDS.
+    private String relationshipStatus;
+
     private boolean premiumUser;
 
     private List<ProfileTripResponse> upcomingTrips;

@@ -144,10 +144,18 @@ public class UserService {
         boolean connectedToViewer = !isOwnProfile
                 && travelPartnerRepository.arePartners(currentUser, targetUser);
 
+        String relationshipStatus = relationshipStatus(
+                currentUser,
+                targetUser,
+                isOwnProfile,
+                connectedToViewer
+        );
+
         return buildProfileResponse(
                 targetUser,
                 isOwnProfile,
                 connectedToViewer,
+                relationshipStatus,
                 upcomingTrips,
                 posts,
                 travelMemories,
@@ -167,6 +175,7 @@ public class UserService {
             User user,
             boolean isOwnProfile,
             boolean connectedToViewer,
+            String relationshipStatus,
             List<ProfileTripResponse> upcomingTrips,
             List<ProfileTripResponse> posts,
             List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories,
@@ -212,6 +221,7 @@ public class UserService {
                 .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
                 .connectedToViewer(connectedToViewer)
+                .relationshipStatus(relationshipStatus)
                 .premiumUser(monetizationService.isPremium(user))
                 .upcomingTrips(upcomingTrips)
                 .posts(posts)
@@ -235,6 +245,45 @@ public class UserService {
                 .friendsHasMore(friendsHasMore)
                 .reviewsHasMore(reviewsHasMore)
                 .build();
+    }
+
+    private String relationshipStatus(
+            User currentUser,
+            User targetUser,
+            boolean isOwnProfile,
+            boolean connectedToViewer) {
+
+        if (isOwnProfile) {
+            return "NONE";
+        }
+
+        if (connectedToViewer) {
+            return "FRIENDS";
+        }
+
+        Optional<MatchRequest> outgoing =
+                matchRequestRepository.findTopBySenderIdAndReceiverIdOrderByCreatedAtDesc(
+                        currentUser.getId(),
+                        targetUser.getId()
+                );
+
+        Optional<MatchRequest> incoming =
+                matchRequestRepository.findTopBySenderIdAndReceiverIdOrderByCreatedAtDesc(
+                        targetUser.getId(),
+                        currentUser.getId()
+                );
+
+        // A pending request in either direction means the profiles are
+        // currently waiting for the match decision.
+        if (outgoing.isPresent() && "PENDING".equalsIgnoreCase(outgoing.get().getStatus())) {
+            return "PENDING";
+        }
+
+        if (incoming.isPresent() && "PENDING".equalsIgnoreCase(incoming.get().getStatus())) {
+            return "PENDING";
+        }
+
+        return "NONE";
     }
 
     private List<ProfileTripResponse> toProfileTripResponses(

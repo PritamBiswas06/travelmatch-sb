@@ -24,6 +24,11 @@ public interface MatchRequestRepository
 
     List<MatchRequest> findBySender(User sender);
 
+    Optional<MatchRequest> findTopBySenderIdAndReceiverIdOrderByCreatedAtDesc(
+            Long senderId,
+            Long receiverId
+    );
+
     Optional<MatchRequest>
     findBySenderIdAndTravelPlanId(
             Long senderId,
