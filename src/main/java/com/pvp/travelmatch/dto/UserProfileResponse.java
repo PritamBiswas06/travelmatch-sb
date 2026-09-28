@@ -56,6 +56,11 @@ public class UserProfileResponse {
     // True when the profile belongs to the currently authenticated user.
     @JsonProperty("isOwnProfile")
     private boolean isOwnProfile;
+
+    // True when the authenticated viewer is already connected to this traveler.
+    // This is derived server-side from TravelPartner, never from client input.
+    private boolean connectedToViewer;
+
     private boolean premiumUser;
 
     private List<ProfileTripResponse> upcomingTrips;

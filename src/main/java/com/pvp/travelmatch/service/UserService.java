@@ -141,9 +141,13 @@ public class UserService {
         List<com.pvp.travelmatch.dto.TravelerReviewResponse> reviews =
                 reviewsPage.getContent();
 
+        boolean connectedToViewer = !isOwnProfile
+                && travelPartnerRepository.arePartners(currentUser, targetUser);
+
         return buildProfileResponse(
                 targetUser,
                 isOwnProfile,
+                connectedToViewer,
                 upcomingTrips,
                 posts,
                 travelMemories,
@@ -162,6 +166,7 @@ public class UserService {
     private UserProfileResponse buildProfileResponse(
             User user,
             boolean isOwnProfile,
+            boolean connectedToViewer,
             List<ProfileTripResponse> upcomingTrips,
             List<ProfileTripResponse> posts,
             List<com.pvp.travelmatch.dto.TravelMemoryResponse> travelMemories,
@@ -206,6 +211,7 @@ public class UserService {
                 .linkedinUrl(user.getLinkedinUrl())
                 .websiteUrl(user.getWebsiteUrl())
                 .isOwnProfile(isOwnProfile)
+                .connectedToViewer(connectedToViewer)
                 .premiumUser(monetizationService.isPremium(user))
                 .upcomingTrips(upcomingTrips)
                 .posts(posts)
