@@ -16,6 +16,14 @@ public enum NotificationType {
 
     TRAVEL_COMMENT,
 
+    SQUAD_INVITE,
+
+    SQUAD_MEMBER_JOINED,
+
+    SQUAD_MEMBER_LEFT,
+
+    SQUAD_MESSAGE,
+
     REVIEW_RECEIVED,
 
     SYSTEM

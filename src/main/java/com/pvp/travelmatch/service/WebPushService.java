@@ -111,6 +111,12 @@ public class WebPushService {
             url = "/profile/" + relatedEntityId;
         } else if (type == NotificationType.NEW_MESSAGE && relatedEntityId != null) {
             url = "/chat/" + relatedEntityId;
+        } else if ((type == NotificationType.SQUAD_INVITE
+                || type == NotificationType.SQUAD_MEMBER_JOINED
+                || type == NotificationType.SQUAD_MEMBER_LEFT
+                || type == NotificationType.SQUAD_MESSAGE)
+                && relatedEntityId != null) {
+            url = "/squads/" + relatedEntityId;
         } else if (type == NotificationType.POST_LIKE) {
             url = "/feed";
         }else if (type == NotificationType.REVIEW_RECEIVED) {

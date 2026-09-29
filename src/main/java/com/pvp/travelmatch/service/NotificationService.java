@@ -203,6 +203,91 @@ public class NotificationService {
         );
     }
 
+    // ==================== Travel Squad ====================
+
+    @Transactional
+    public void createSquadInviteNotification(
+            User receiver,
+            User sender,
+            Long squadId,
+            String squadName) {
+
+        boolean alreadyHasUnreadInvite =
+                notificationRepository
+                        .existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
+                                sender.getId(),
+                                receiver.getId(),
+                                NotificationType.SQUAD_INVITE,
+                                squadId
+                        );
+
+        if (alreadyHasUnreadInvite) {
+            return;
+        }
+
+        createNotification(
+                receiver,
+                sender,
+                "👥 " + sender.getName() + " invited you to join " + squadName + ".",
+                NotificationType.SQUAD_INVITE,
+                squadId
+        );
+    }
+
+    @Transactional
+    public void createSquadMemberNotification(
+            User receiver,
+            User sender,
+            Long squadId,
+            String message,
+            NotificationType type) {
+
+        if (receiver.getId().equals(sender.getId())) {
+            return;
+        }
+
+        createNotification(
+                receiver,
+                sender,
+                message,
+                type,
+                squadId
+        );
+    }
+
+    @Transactional
+    public void createSquadMessageNotification(
+            User receiver,
+            User sender,
+            Long squadId,
+            String squadName) {
+
+        if (receiver.getId().equals(sender.getId())) {
+            return;
+        }
+
+        boolean alreadyHasUnreadMessage =
+                notificationRepository
+                        .existsBySenderIdAndReceiverIdAndTypeAndRelatedEntityIdAndIsReadFalse(
+                                sender.getId(),
+                                receiver.getId(),
+                                NotificationType.SQUAD_MESSAGE,
+                                squadId
+                        );
+
+        if (alreadyHasUnreadMessage) {
+            return;
+        }
+
+        createNotification(
+                receiver,
+                sender,
+                "💬 " + sender.getName() + " sent a message in " + squadName + ".",
+                NotificationType.SQUAD_MESSAGE,
+                squadId
+        );
+    }
+
     // ==================== Get notifications for logged-in user ====================
 
     public List<NotificationResponse> getMyNotifications() {
