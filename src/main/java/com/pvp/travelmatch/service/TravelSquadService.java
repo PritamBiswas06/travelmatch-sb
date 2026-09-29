@@ -199,7 +199,19 @@ public class TravelSquadService {
     public TravelSquadResponse getSquad(Long squadId) {
         User currentUser = getCurrentUser();
         TravelSquad squad = getSquadOrThrow(squadId);
-        requireActiveMember(squadId, currentUser.getId());
+
+        // A pending invite must be able to open the squad page so the
+        // invited traveler can review the trip and accept/decline it.
+        // Only active members are allowed to access the private chat/actions.
+        TravelSquadMember viewerMembership = getMembership(squadId, currentUser.getId());
+
+        if (!"ACTIVE".equalsIgnoreCase(viewerMembership.getStatus())
+                && !"INVITED".equalsIgnoreCase(viewerMembership.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You are not allowed to view this squad"
+            );
+        }
 
         return toResponse(
                 squad,
