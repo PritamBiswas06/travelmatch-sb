@@ -5,6 +5,7 @@ import com.pvp.travelmatch.entity.TravelPlan;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import com.pvp.travelmatch.entity.BlockedUser;
+import com.pvp.travelmatch.entity.TrustVerification;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,15 @@ public final class TravelPlanSpecifications {
                             cb.exists(blockedSubquery)
                     )
             );
+
+            var hiddenProfileSubquery = query.subquery(Long.class);
+            var hiddenProfileRoot = hiddenProfileSubquery.from(TrustVerification.class);
+            hiddenProfileSubquery.select(cb.literal(1L));
+            hiddenProfileSubquery.where(
+                    cb.equal(hiddenProfileRoot.get("user").get("id"), root.get("user").get("id")),
+                    cb.isFalse(hiddenProfileRoot.get("profileDiscoverable"))
+            );
+            predicates.add(cb.not(cb.exists(hiddenProfileSubquery)));
 
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
             predicates.add(cb.greaterThanOrEqualTo(root.get("endDate"), today));

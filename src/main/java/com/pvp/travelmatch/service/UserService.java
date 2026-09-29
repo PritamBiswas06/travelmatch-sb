@@ -16,12 +16,15 @@ import com.pvp.travelmatch.repository.TravelMemoryRepository;
 import com.pvp.travelmatch.repository.TravelPlanRepository;
 import com.pvp.travelmatch.repository.TravelPartnerRepository;
 import com.pvp.travelmatch.repository.UserRepository;
+import com.pvp.travelmatch.repository.TrustVerificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 
 import java.time.LocalDate;
@@ -47,6 +50,7 @@ public class UserService {
     private final TravelCommentRepository travelCommentRepository;
     private final TravelMemoryRepository travelMemoryRepository;
     private final MonetizationService monetizationService;
+    private final TrustVerificationRepository trustVerificationRepository;
 
     // ==================== VIEW PROFILE ====================
 
@@ -62,6 +66,13 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Traveler not found"));
 
         boolean isOwnProfile = currentUser.getId().equals(targetUser.getId());
+        boolean connectedToViewer = !isOwnProfile
+                && travelPartnerRepository.arePartners(currentUser, targetUser);
+        boolean discoverable = trustVerificationRepository.findByUserId(targetUser.getId())
+                .map(t -> t.isProfileDiscoverable()).orElse(true);
+        if (!isOwnProfile && !connectedToViewer && !discoverable) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This traveler has limited profile visibility.");
+        }
 
         if (!isOwnProfile) {
             try {
@@ -141,9 +152,6 @@ public class UserService {
         List<com.pvp.travelmatch.dto.TravelerReviewResponse> reviews =
                 reviewsPage.getContent();
 
-        boolean connectedToViewer = !isOwnProfile
-                && travelPartnerRepository.arePartners(currentUser, targetUser);
-
         String relationshipStatus = relationshipStatus(
                 currentUser,
                 targetUser,
@@ -187,6 +195,7 @@ public class UserService {
             boolean memoriesHasMore,
             boolean friendsHasMore,
             boolean reviewsHasMore) {
+        var trust = trustVerificationRepository.findByUserId(user.getId()).orElse(null);
         return UserProfileResponse.builder()
                 .userId(user.getId())
                 .name(user.getName())
@@ -197,6 +206,12 @@ public class UserService {
                 .state(user.getState())
                 .country(user.getCountry())
                 .verified(Boolean.TRUE.equals(user.getVerified()))
+                .phoneVerified(trust != null && trust.isPhoneVerified())
+                .identityVerified(trust != null && "VERIFIED".equals(trust.getIdentityStatus()))
+                .selfieVerified(trust != null && "VERIFIED".equals(trust.getSelfieStatus()))
+                .trustedTraveler(travelPlanRepository.countByUserIdAndStatus(user.getId(), "COMPLETED") >= 1
+                        && travelerReviewService.getCount(user.getId()) >= 3
+                        && travelerReviewService.getAverage(user.getId()) >= 4.0)
                 .bio(user.getBio())
                 .profilePhotoUrl(toPhotoDataUri(user))
                 .travelStyle(splitToList(user.getTravelStyle()))
@@ -539,6 +554,7 @@ public class UserService {
         }
 
         userRepository.save(currentUser);
+        resetProfilePhotoReview(currentUser.getId());
 
         return getProfile(currentUser.getId());
     }
@@ -552,8 +568,18 @@ public class UserService {
         currentUser.setProfilePhotoUpdatedAt(null);
 
         userRepository.save(currentUser);
+        resetProfilePhotoReview(currentUser.getId());
 
         return getProfile(currentUser.getId());
+    }
+
+    private void resetProfilePhotoReview(Long userId) {
+        trustVerificationRepository.findByUserId(userId).ifPresent(trust -> {
+            trust.setProfilePhotoReviewStatus("NOT_SUBMITTED");
+            trust.setProfilePhotoReviewedAt(null);
+            trust.setProfilePhotoReviewNote(null);
+            trustVerificationRepository.save(trust);
+        });
     }
 
     // ==================== HELPERS ====================

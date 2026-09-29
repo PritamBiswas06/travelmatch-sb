@@ -24,6 +24,12 @@ public class UserProfileResponse {
 
     private Boolean verified;
 
+    // Separate trust signals: email verification is not government identity verification.
+    private boolean phoneVerified;
+    private boolean identityVerified;
+    private boolean selfieVerified;
+    private boolean trustedTraveler;
+
     private String bio;
 
     // Data URI (e.g. "data:image/png;base64,...") or null if not set — the

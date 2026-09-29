@@ -41,6 +41,8 @@ public interface TravelPlanRepository
 
     long countByUserId(Long userId);
 
+    long countByUserIdAndStatus(Long userId, String status);
+
     Optional<TravelPlan> findTopByUserIdOrderByCreatedAtDesc(Long userId);
 
     @Override
@@ -67,6 +69,10 @@ public interface TravelPlanRepository
         AND t.user.id <> :userId
         AND t.startDate <= :endDate
         AND t.endDate >= :startDate
+        AND NOT EXISTS (
+            SELECT 1 FROM TrustVerification tv
+            WHERE tv.user.id = t.user.id AND tv.profileDiscoverable = false
+        )
     """)
     List<TravelPlan> findMatchingPlans(
             String destination,
@@ -90,6 +96,12 @@ public interface TravelPlanRepository
               FROM BlockedUser b
               WHERE b.blocker.id = :userId
                 AND b.blockedUser.id = u.id
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM TrustVerification tv
+              WHERE tv.user.id = u.id
+                AND tv.profileDiscoverable = false
           )
         ORDER BY t.createdAt DESC
     """)
