@@ -130,6 +130,7 @@ public class TrustCenterService {
             return "Your profile photo is already waiting for moderator review.";
         }
         trust.setProfilePhotoReviewStatus("PENDING");
+        trust.setProfilePhotoSubmittedAt(LocalDateTime.now());
         trust.setProfilePhotoReviewedAt(null);
         trust.setProfilePhotoReviewNote(null);
         verifications.save(trust);

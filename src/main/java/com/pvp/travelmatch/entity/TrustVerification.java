@@ -42,6 +42,8 @@ public class TrustVerification {
     @Builder.Default private boolean profileDiscoverable = true;
     @Column(name = "profile_photo_review_status", nullable = false, length = 24)
     @Builder.Default private String profilePhotoReviewStatus = "NOT_SUBMITTED";
+    @Column(name = "profile_photo_submitted_at")
+    private LocalDateTime profilePhotoSubmittedAt;
     @Column(name = "profile_photo_reviewed_at")
     private LocalDateTime profilePhotoReviewedAt;
     @Column(name = "profile_photo_review_note", length = 250)

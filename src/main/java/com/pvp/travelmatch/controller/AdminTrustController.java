@@ -37,17 +37,34 @@ public class AdminTrustController {
     /** Admin-only queue for manually reviewing the existing profile photo. */
     @GetMapping("/photo-reviews")
     public List<PhotoReviewQueueItem> pendingPhotoReviews() {
-        return users.findAll().stream().map(user -> {
-            var trust = verifications.findByUserId(user.getId()).orElse(null);
-            if (trust == null || !"PENDING".equals(trust.getProfilePhotoReviewStatus())) return null;
-            byte[] photo = user.getProfilePhoto();
-            String mime = user.getProfilePhotoContentType();
-            String dataUrl = photo == null || photo.length == 0 || mime == null ? null
-                    : "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo);
-            return PhotoReviewQueueItem.builder().userId(user.getId()).name(user.getName())
-                    .email(user.getEmail()).photoDataUrl(dataUrl).status(trust.getProfilePhotoReviewStatus())
-                    .submittedAt(trust.getUpdatedAt()).build();
-        }).filter(java.util.Objects::nonNull).toList();
+        return verifications
+                .findByProfilePhotoReviewStatusOrderByProfilePhotoSubmittedAtAsc("PENDING")
+                .stream()
+                .map(trust -> {
+                    User user = trust.getUser();
+                    byte[] photo = user.getProfilePhoto();
+                    String mime = user.getProfilePhotoContentType();
+
+                    // Only expose image data to the admin UI; never treat arbitrary
+                    // content types as browser-renderable image data.
+                    boolean safeImageType = mime != null && (
+                            mime.equalsIgnoreCase("image/jpeg")
+                                    || mime.equalsIgnoreCase("image/png")
+                                    || mime.equalsIgnoreCase("image/webp"));
+                    String dataUrl = photo == null || photo.length == 0 || !safeImageType
+                            ? null
+                            : "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo);
+
+                    return PhotoReviewQueueItem.builder()
+                            .userId(user.getId())
+                            .name(user.getName())
+                            .email(user.getEmail())
+                            .photoDataUrl(dataUrl)
+                            .status(trust.getProfilePhotoReviewStatus())
+                            .submittedAt(trust.getProfilePhotoSubmittedAt())
+                            .build();
+                })
+                .toList();
     }
 
     @PutMapping("/photo-reviews/{userId}")
@@ -57,6 +74,11 @@ public class AdminTrustController {
         if (!status.equals("APPROVED") && !status.equals("REJECTED")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status must be APPROVED or REJECTED.");
         }
+        String note = request.getNote() == null ? "" : request.getNote().trim();
+        if (status.equals("REJECTED") && note.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Add a short note explaining what the user needs to change.");
+        }
         User user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         var trust = verifications.findByUserId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photo review request not found."));
         if (!"PENDING".equals(trust.getProfilePhotoReviewStatus())) {
@@ -64,8 +86,7 @@ public class AdminTrustController {
         }
         trust.setProfilePhotoReviewStatus(status);
         trust.setProfilePhotoReviewedAt(LocalDateTime.now());
-        String note = request.getNote() == null ? null : request.getNote().trim();
-        trust.setProfilePhotoReviewNote(note == null || note.isBlank() ? null : note);
+        trust.setProfilePhotoReviewNote(note.isBlank() ? null : note);
         verifications.save(trust);
         return java.util.Map.of("message", "Photo review marked " + status.toLowerCase() + ".");
     }

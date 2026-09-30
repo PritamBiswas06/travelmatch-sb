@@ -576,6 +576,7 @@ public class UserService {
     private void resetProfilePhotoReview(Long userId) {
         trustVerificationRepository.findByUserId(userId).ifPresent(trust -> {
             trust.setProfilePhotoReviewStatus("NOT_SUBMITTED");
+            trust.setProfilePhotoSubmittedAt(null);
             trust.setProfilePhotoReviewedAt(null);
             trust.setProfilePhotoReviewNote(null);
             trustVerificationRepository.save(trust);
