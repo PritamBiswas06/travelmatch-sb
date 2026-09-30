@@ -10,6 +10,7 @@ import com.pvp.travelmatch.repository.UserRepository;
 import com.pvp.travelmatch.security.JwtService;
 import com.pvp.travelmatch.service.AdminEmailService;
 import com.pvp.travelmatch.service.EmailService;
+import com.pvp.travelmatch.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +35,7 @@ public class AuthController {
      * through TRAVELMATCH_ADMIN_EMAILS.
      */
     private final AdminEmailService adminEmailService;
+    private final AnalyticsService analyticsService;
 
 
     // =========================================================
@@ -142,6 +144,7 @@ public class AuthController {
         // =====================================================
 
         userRepository.save(user);
+        recordAnalyticsSafely(() -> analyticsService.recordRegistration(user));
 
 
         // =====================================================
@@ -247,6 +250,15 @@ public class AuthController {
     // =========================================================
     // OTP
     // =========================================================
+
+    private void recordAnalyticsSafely(Runnable event) {
+        try {
+            event.run();
+        } catch (Exception ex) {
+            // Analytics is best-effort and must never block registration or sign-in.
+            System.err.println("TravelMatch analytics event could not be recorded.");
+        }
+    }
 
     private String generateOTP() {
 
@@ -394,6 +406,7 @@ public class AuthController {
                 )
         ) {
 
+            recordAnalyticsSafely(() -> analyticsService.recordLoginFailure(user));
             throw new RuntimeException(
                     "Please verify your email first"
             );
@@ -411,6 +424,7 @@ public class AuthController {
                 )
         ) {
 
+            recordAnalyticsSafely(() -> analyticsService.recordLoginFailure(user));
             throw new RuntimeException(
                     "Incorrect password"
             );
@@ -429,6 +443,7 @@ public class AuthController {
 
         if (status == AccountStatus.SUSPENDED) {
 
+            recordAnalyticsSafely(() -> analyticsService.recordLoginFailure(user));
             throw new RuntimeException(
                     "Your account has been suspended"
             );
@@ -437,6 +452,7 @@ public class AuthController {
 
         if (status == AccountStatus.DEACTIVATED) {
 
+            recordAnalyticsSafely(() -> analyticsService.recordLoginFailure(user));
             throw new RuntimeException(
                     "Your account has been deactivated"
             );
@@ -484,6 +500,7 @@ public class AuthController {
          * This fixes existing accounts as well.
          */
         userRepository.save(user);
+        recordAnalyticsSafely(() -> analyticsService.recordLogin(user));
 
 
         // -----------------------------------------------------

@@ -2,6 +2,7 @@ package com.pvp.travelmatch.security;
 
 import com.pvp.travelmatch.dto.AuthResponse;
 import com.pvp.travelmatch.service.SocialAuthService;
+import com.pvp.travelmatch.service.AnalyticsService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final SocialAuthService socialAuthService;
+    private final AnalyticsService analyticsService;
 
     @Value("${app.frontend-url:https://tripmatch.fun}")
     private String frontendUrl;
@@ -40,13 +42,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         try {
             AuthResponse auth = socialAuthService.authenticate(oauthUser, provider);
+            try { analyticsService.recordLoginByUserId(auth.getUserId()); }
+            catch (Exception ex) { System.err.println("TravelMatch analytics event could not be recorded."); }
 
             String fragment =
                     "token=" + encode(auth.getToken())
-                    + "&userId=" + encode(String.valueOf(auth.getUserId()))
-                    + "&name=" + encode(auth.getName())
-                    + "&role=" + encode(auth.getRole())
-                    + "&requiresOnboarding=" + encode(String.valueOf(auth.isRequiresOnboarding()));
+                            + "&userId=" + encode(String.valueOf(auth.getUserId()))
+                            + "&name=" + encode(auth.getName())
+                            + "&role=" + encode(auth.getRole())
+                            + "&requiresOnboarding=" + encode(String.valueOf(auth.isRequiresOnboarding()));
 
             response.sendRedirect(
                     frontendUrl.replaceAll("/$", "")
