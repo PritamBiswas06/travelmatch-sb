@@ -34,6 +34,7 @@ public class TrustCenterService {
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @Value("${travelmatch.trust.phone-verification-enabled:false}") private boolean phoneVerificationEnabled;
     @Value("${travelmatch.identity.provider-url:}") private String identityProviderUrl;
     @Value("${travelmatch.selfie.provider-url:}") private String selfieProviderUrl;
 
@@ -47,6 +48,7 @@ public class TrustCenterService {
         if ("VERIFIED".equals(trust.getIdentityStatus())) badges.add("IDENTITY_VERIFIED");
         if ("VERIFIED".equals(trust.getSelfieStatus())) badges.add("SELFIE_CHECKED");
         if ("APPROVED".equals(trust.getProfilePhotoReviewStatus())) badges.add("PHOTO_REVIEWED");
+        if ("APPROVED".equals(trust.getSelfieReviewStatus())) badges.add("SELFIE_REVIEWED");
         if (travelDnaComplete(user)) badges.add("TRAVEL_DNA_COMPLETE");
         int completion = profileCompletion(user);
         if (completion >= 90) badges.add("PROFILE_COMPLETE");
@@ -63,6 +65,8 @@ public class TrustCenterService {
                 .identityStatus(trust.getIdentityStatus()).selfieStatus(trust.getSelfieStatus())
                 .profilePhotoReviewStatus(trust.getProfilePhotoReviewStatus())
                 .profilePhotoReviewNote(trust.getProfilePhotoReviewNote())
+                .selfieReviewStatus(trust.getSelfieReviewStatus())
+                .selfieReviewNote(trust.getSelfieReviewNote())
                 .profileCompletion(completion).travelDnaComplete(travelDnaComplete(user))
                 .completedTrips(completedTrips).averageRating(average).reviewCount(reviewCount)
                 .emergencySharingEnabled(trust.isEmergencySharingEnabled()).profileDiscoverable(trust.isProfileDiscoverable())
@@ -74,6 +78,8 @@ public class TrustCenterService {
 
     @Transactional
     public void startPhoneVerification(PhoneStartRequest request) {
+        if (!phoneVerificationEnabled) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "SMS verification is disabled. Use email verification and the free manual photo-review options.");
         User user = currentUser();
         TrustVerification trust = findOrCreate(user);
         LocalDateTime now = LocalDateTime.now();
@@ -135,6 +141,23 @@ public class TrustCenterService {
         trust.setProfilePhotoReviewNote(null);
         verifications.save(trust);
         return "Your profile photo was submitted for manual review.";
+    }
+
+    @Transactional
+    public String submitSelfieForReview(byte[] bytes, String contentType) {
+        User user = currentUser();
+        if (bytes == null || bytes.length == 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a selfie image first.");
+        if (bytes.length > 5 * 1024 * 1024) throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Selfie image must be 5 MB or smaller.");
+        TrustVerification trust = findOrCreate(user);
+        if ("PENDING".equals(trust.getSelfieReviewStatus())) return "Your selfie is already waiting for moderator review.";
+        trust.setSelfiePhoto(bytes);
+        trust.setSelfieContentType(contentType);
+        trust.setSelfieReviewStatus("PENDING");
+        trust.setSelfieSubmittedAt(LocalDateTime.now());
+        trust.setSelfieReviewedAt(null);
+        trust.setSelfieReviewNote(null);
+        verifications.save(trust);
+        return "Your selfie was submitted for manual review. This is not government ID or liveness verification.";
     }
 
     public String startIdentityVerification() {

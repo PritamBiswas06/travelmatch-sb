@@ -18,6 +18,9 @@ public interface TrustVerificationRepository extends JpaRepository<TrustVerifica
     @EntityGraph(attributePaths = "user")
     List<TrustVerification> findByProfilePhotoReviewStatusOrderByProfilePhotoSubmittedAtAsc(String status);
 
+    @EntityGraph(attributePaths = "user")
+    List<TrustVerification> findBySelfieReviewStatusOrderBySelfieSubmittedAtAsc(String status);
+
     @Query("select count(tv) from TrustVerification tv where tv.phoneNumber = :phoneNumber and tv.phoneVerified = true and tv.user.id <> :userId")
     long countVerifiedPhoneDuplicates(@Param("phoneNumber") String phoneNumber, @Param("userId") Long userId);
 }

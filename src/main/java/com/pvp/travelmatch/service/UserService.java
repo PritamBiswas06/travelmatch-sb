@@ -209,6 +209,8 @@ public class UserService {
                 .phoneVerified(trust != null && trust.isPhoneVerified())
                 .identityVerified(trust != null && "VERIFIED".equals(trust.getIdentityStatus()))
                 .selfieVerified(trust != null && "VERIFIED".equals(trust.getSelfieStatus()))
+                .profilePhotoReviewed(trust != null && "APPROVED".equals(trust.getProfilePhotoReviewStatus()))
+                .selfieReviewed(trust != null && "APPROVED".equals(trust.getSelfieReviewStatus()))
                 .trustedTraveler(travelPlanRepository.countByUserIdAndStatus(user.getId(), "COMPLETED") >= 1
                         && travelerReviewService.getCount(user.getId()) >= 3
                         && travelerReviewService.getAverage(user.getId()) >= 4.0)

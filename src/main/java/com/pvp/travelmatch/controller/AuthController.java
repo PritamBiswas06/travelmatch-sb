@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,6 +35,8 @@ public class AuthController {
      * through TRAVELMATCH_ADMIN_EMAILS.
      */
     private final AdminEmailService adminEmailService;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private final AnalyticsService analyticsService;
 
 
@@ -262,9 +264,7 @@ public class AuthController {
 
     private String generateOTP() {
 
-        return String.valueOf(
-                new Random().nextInt(900000) + 100000
-        );
+        return String.valueOf(SECURE_RANDOM.nextInt(900000) + 100000);
     }
 
 
@@ -391,7 +391,7 @@ public class AuthController {
                 userRepository.findByEmail(request.getEmail())
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "Email not registered"
+                                        "Invalid email or password"
                                 )
                         );
 
@@ -426,7 +426,7 @@ public class AuthController {
 
             recordAnalyticsSafely(() -> analyticsService.recordLoginFailure(user));
             throw new RuntimeException(
-                    "Incorrect password"
+                    "Invalid email or password"
             );
         }
 
@@ -549,7 +549,7 @@ public class AuthController {
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "Email not registered"
+                                        "Invalid email or password"
                                 )
                         );
 

@@ -33,6 +33,11 @@ public class ChatService {
                 .getAuthentication()
                 .getPrincipal();
 
+        if (content == null || content.isBlank()) throw new IllegalArgumentException("Message cannot be empty.");
+        content = content.trim();
+        if (content.length() > 1500) throw new IllegalArgumentException("Message is too long (maximum 1500 characters).");
+        if (content.chars().anyMatch(ch -> ch == 0)) throw new IllegalArgumentException("Message contains invalid characters.");
+
         User sender = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

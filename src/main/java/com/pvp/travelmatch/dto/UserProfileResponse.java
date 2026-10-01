@@ -28,6 +28,8 @@ public class UserProfileResponse {
     private boolean phoneVerified;
     private boolean identityVerified;
     private boolean selfieVerified;
+    private boolean profilePhotoReviewed;
+    private boolean selfieReviewed;
     private boolean trustedTraveler;
 
     private String bio;

@@ -1,6 +1,7 @@
 package com.pvp.travelmatch.config;
 
 import com.pvp.travelmatch.security.JwtAuthFilter;
+import com.pvp.travelmatch.security.RateLimitFilter;
 import com.pvp.travelmatch.security.OAuth2FailureHandler;
 import com.pvp.travelmatch.security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -27,12 +29,22 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
+    private final RateLimitFilter rateLimitFilter;
+
     private final OAuth2SuccessHandler oauth2SuccessHandler;
 
     private final OAuth2FailureHandler oauth2FailureHandler;
 
     private final Environment environment;
 
+
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> disableContainerRateLimitRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -69,7 +81,8 @@ public class SecurityConfig {
                                 "/api/users/*/photo"
                         ).permitAll()
 
-                        // Admin APIs
+                        // Admin APIs, including the legacy reports endpoint.
+                        .requestMatchers("/api/reports/admin").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
@@ -135,6 +148,11 @@ public class SecurityConfig {
          * JWT authentication remains active for both
          * local and production environments.
          */
+        http.addFilterBefore(
+                rateLimitFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
+
         http.addFilterBefore(
                 jwtAuthFilter,
                 UsernamePasswordAuthenticationFilter.class

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,7 @@ public class User {
 
     private String name;
     private String email;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     private Integer age;
@@ -53,14 +55,18 @@ public class User {
     @Column(nullable = false)
     private Boolean verified = false;
 
+    @JsonIgnore
     private String verificationCode;
 
+    @JsonIgnore
     private LocalDateTime codeExpiry;
 
     @Column(name = "reset_code")
+    @JsonIgnore
     private String resetCode;
 
     @Column(name = "reset_code_expiry")
+    @JsonIgnore
     private LocalDateTime resetCodeExpiry;
 
     // ==================== PROFILE FIELDS ====================
@@ -146,6 +152,7 @@ public class User {
     // Profile photo stored directly in the database (no existing file/cloud
     // storage mechanism to reuse, and this avoids relying on ephemeral local
     // disk storage on the deployment platform).
+    @JsonIgnore
     @Lob
     @Basic(fetch = FetchType.LAZY)
     @Column(columnDefinition = "LONGBLOB")

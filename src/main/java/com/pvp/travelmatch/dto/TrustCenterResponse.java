@@ -13,6 +13,8 @@ public class TrustCenterResponse {
     String selfieStatus;
     String profilePhotoReviewStatus;
     String profilePhotoReviewNote;
+    String selfieReviewStatus;
+    String selfieReviewNote;
     int profileCompletion;
     boolean travelDnaComplete;
     long completedTrips;

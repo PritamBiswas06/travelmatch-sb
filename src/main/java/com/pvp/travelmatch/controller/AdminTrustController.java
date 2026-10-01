@@ -34,41 +34,46 @@ public class AdminTrustController {
     private final ReportRepository reports;
     private final TrustVerificationRepository verifications;
 
-    /** Admin-only queue for manually reviewing the existing profile photo. */
+    /** Admin-only queue for profile photos and optional manual selfie reviews. */
     @GetMapping("/photo-reviews")
     public List<PhotoReviewQueueItem> pendingPhotoReviews() {
-        return verifications
+        List<PhotoReviewQueueItem> profilePhotos = verifications
                 .findByProfilePhotoReviewStatusOrderByProfilePhotoSubmittedAtAsc("PENDING")
-                .stream()
-                .map(trust -> {
+                .stream().map(trust -> {
                     User user = trust.getUser();
-                    byte[] photo = user.getProfilePhoto();
-                    String mime = user.getProfilePhotoContentType();
+                    return PhotoReviewQueueItem.builder().userId(user.getId()).name(user.getName()).email(user.getEmail())
+                            .photoDataUrl(toDataUrl(user.getProfilePhoto(), user.getProfilePhotoContentType()))
+                            .status(trust.getProfilePhotoReviewStatus()).reviewType("PROFILE_PHOTO")
+                            .submittedAt(trust.getProfilePhotoSubmittedAt()).build();
+                }).toList();
+        List<PhotoReviewQueueItem> selfies = verifications
+                .findBySelfieReviewStatusOrderBySelfieSubmittedAtAsc("PENDING")
+                .stream().map(trust -> {
+                    User user = trust.getUser();
+                    return PhotoReviewQueueItem.builder().userId(user.getId()).name(user.getName()).email(user.getEmail())
+                            .photoDataUrl(toDataUrl(trust.getSelfiePhoto(), trust.getSelfieContentType()))
+                            .status(trust.getSelfieReviewStatus()).reviewType("SELFIE")
+                            .submittedAt(trust.getSelfieSubmittedAt()).build();
+                }).toList();
+        List<PhotoReviewQueueItem> all = new ArrayList<>();
+        all.addAll(profilePhotos); all.addAll(selfies);
+        return all.stream().sorted((left, right) -> {
+            if (left.getSubmittedAt() == null) return right.getSubmittedAt() == null ? 0 : 1;
+            if (right.getSubmittedAt() == null) return -1;
+            return left.getSubmittedAt().compareTo(right.getSubmittedAt());
+        }).toList();
+    }
 
-                    // Only expose image data to the admin UI; never treat arbitrary
-                    // content types as browser-renderable image data.
-                    boolean safeImageType = mime != null && (
-                            mime.equalsIgnoreCase("image/jpeg")
-                                    || mime.equalsIgnoreCase("image/png")
-                                    || mime.equalsIgnoreCase("image/webp"));
-                    String dataUrl = photo == null || photo.length == 0 || !safeImageType
-                            ? null
-                            : "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo);
-
-                    return PhotoReviewQueueItem.builder()
-                            .userId(user.getId())
-                            .name(user.getName())
-                            .email(user.getEmail())
-                            .photoDataUrl(dataUrl)
-                            .status(trust.getProfilePhotoReviewStatus())
-                            .submittedAt(trust.getProfilePhotoSubmittedAt())
-                            .build();
-                })
-                .toList();
+    private String toDataUrl(byte[] photo, String mime) {
+        boolean safeImageType = mime != null && (mime.equalsIgnoreCase("image/jpeg")
+                || mime.equalsIgnoreCase("image/png") || mime.equalsIgnoreCase("image/webp"));
+        return photo == null || photo.length == 0 || !safeImageType ? null
+                : "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo);
     }
 
     @PutMapping("/photo-reviews/{userId}")
     public java.util.Map<String, String> decidePhotoReview(@PathVariable Long userId,
+                                                           @RequestParam(defaultValue = "PROFILE_PHOTO") String type,
                                                            @Valid @RequestBody PhotoReviewDecisionRequest request) {
         String status = request.getStatus() == null ? "" : request.getStatus().trim().toUpperCase();
         if (!status.equals("APPROVED") && !status.equals("REJECTED")) {
@@ -76,19 +81,23 @@ public class AdminTrustController {
         }
         String note = request.getNote() == null ? "" : request.getNote().trim();
         if (status.equals("REJECTED") && note.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Add a short note explaining what the user needs to change.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add a short note explaining what the user needs to change.");
         }
-        User user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
-        var trust = verifications.findByUserId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photo review request not found."));
-        if (!"PENDING".equals(trust.getProfilePhotoReviewStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This photo is not waiting for review.");
+        users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+        var trust = verifications.findByUserId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review request not found."));
+        if ("SELFIE".equalsIgnoreCase(type)) {
+            if (!"PENDING".equals(trust.getSelfieReviewStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "This selfie is not waiting for review.");
+            trust.setSelfieReviewStatus(status); trust.setSelfieReviewedAt(LocalDateTime.now()); trust.setSelfieReviewNote(note.isBlank() ? null : note);
+            // Keep the submitted image only while pending; remove it after a decision.
+            trust.setSelfiePhoto(null); trust.setSelfieContentType(null);
+        } else if ("PROFILE_PHOTO".equalsIgnoreCase(type)) {
+            if (!"PENDING".equals(trust.getProfilePhotoReviewStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "This photo is not waiting for review.");
+            trust.setProfilePhotoReviewStatus(status); trust.setProfilePhotoReviewedAt(LocalDateTime.now()); trust.setProfilePhotoReviewNote(note.isBlank() ? null : note);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown review type.");
         }
-        trust.setProfilePhotoReviewStatus(status);
-        trust.setProfilePhotoReviewedAt(LocalDateTime.now());
-        trust.setProfilePhotoReviewNote(note.isBlank() ? null : note);
         verifications.save(trust);
-        return java.util.Map.of("message", "Photo review marked " + status.toLowerCase() + ".");
+        return java.util.Map.of("message", ("SELFIE".equalsIgnoreCase(type) ? "Selfie" : "Profile photo") + " review marked " + status.toLowerCase() + ".");
     }
 
     /** Admin-only review queue. Signals are descriptive, not an automatic fraud verdict. */

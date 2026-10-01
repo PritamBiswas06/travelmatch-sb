@@ -11,5 +11,6 @@ public class PhotoReviewQueueItem {
     String email;
     String photoDataUrl;
     String status;
+    String reviewType;
     LocalDateTime submittedAt;
 }
