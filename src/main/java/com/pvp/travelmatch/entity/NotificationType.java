@@ -4,6 +4,8 @@ public enum NotificationType {
 
     MATCH_REQUEST_RECEIVED,
 
+    SMART_TRIP_MATCH,
+
     MATCH_REQUEST_ACCEPTED,
 
     MATCH_REQUEST_REJECTED,

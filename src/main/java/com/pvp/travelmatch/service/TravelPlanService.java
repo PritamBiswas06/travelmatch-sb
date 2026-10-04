@@ -43,6 +43,7 @@ public class TravelPlanService {
     private final MonetizationService monetizationService;
     private final BoostedTravelPlanRepository boostedTravelPlanRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SmartMatchService smartMatchService;
 
     @Value("${app.frontend-url:https://tripmatch.fun}")
     private String frontendUrl;
@@ -78,6 +79,14 @@ public class TravelPlanService {
                 .build();
 
         TravelPlan savedPlan = travelPlanRepository.save(plan);
+
+        // Smart Match is a non-critical side effect: a failure here must not
+        // block successful trip creation.
+        try {
+            smartMatchService.processForPlan(savedPlan);
+        } catch (Exception e) {
+            System.err.println("Smart Match processing failed after trip creation: " + e.getMessage());
+        }
 
         String dashboardLink = frontendUrl + "/dashboard";
 
@@ -248,7 +257,13 @@ Keep an eye on your inbox for match requests 👀
         plan.setOpenForJoining(request.getOpenForJoining());
         plan.setFamilyFriendly(request.getFamilyFriendly());
         plan.setChildrenAllowed(request.getChildrenAllowed());
-        return travelPlanRepository.save(plan);
+        TravelPlan saved = travelPlanRepository.save(plan);
+        try {
+            smartMatchService.processForPlan(saved);
+        } catch (Exception e) {
+            System.err.println("Smart Match processing failed after trip update: " + e.getMessage());
+        }
+        return saved;
     }
 
     private void validateGroupFields(TravelPlanRequest request) {

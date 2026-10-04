@@ -81,6 +81,41 @@ public interface TravelPlanRepository
             Long userId
     );
 
+    /** Candidate trips for Smart Match. */
+    @Query("""
+        SELECT t FROM TravelPlan t
+        WHERE t.user.id <> :userId
+          AND t.status = 'ACTIVE'
+          AND t.endDate >= :today
+          AND (
+                LOWER(TRIM(t.destination)) = LOWER(TRIM(:destination))
+                OR (t.startDate <= :endDate AND t.endDate >= :startDate)
+          )
+          AND NOT EXISTS (
+                SELECT 1 FROM BlockedUser b
+                WHERE b.blocker.id = :userId
+                  AND b.blockedUser.id = t.user.id
+          )
+          AND NOT EXISTS (
+                SELECT 1 FROM BlockedUser b2
+                WHERE b2.blocker.id = t.user.id
+                  AND b2.blockedUser.id = :userId
+          )
+          AND NOT EXISTS (
+                SELECT 1 FROM TrustVerification tv
+                WHERE tv.user.id = t.user.id
+                  AND tv.profileDiscoverable = false
+          )
+        ORDER BY t.createdAt DESC
+    """)
+    List<TravelPlan> findSmartMatchCandidates(
+            String destination,
+            LocalDate startDate,
+            LocalDate endDate,
+            Long userId,
+            LocalDate today
+    );
+
     List<TravelPlan> findByUserIdNot(Long userId);
 
 
